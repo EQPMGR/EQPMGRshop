@@ -55,7 +55,11 @@ const geocodePrompt = ai.definePrompt({
   input: { schema: GeocodeInputSchema },
   output: { schema: z.object({ lat: z.number(), lng: z.number() }) },
   tools: [getCoordinatesTool],
-  prompt: `Use the getCoordinates tool to find the latitude and longitude for the following address: {{{input}}}`,
+  prompt: `You are a geocoding assistant. Your task is to find the geographic coordinates for the given address and then output them in the specified format.
+
+Use the getCoordinates tool to find the latitude and longitude for the following address: {{{input}}}
+
+After using the tool, you MUST output the latitude and longitude in the required JSON format.`,
 });
 
 // A simple geohash implementation since we removed the external dependency.
@@ -110,11 +114,14 @@ const geocodeFlow = ai.defineFlow(
   },
   async (address) => {
     const llmResponse = await geocodePrompt(address);
-    const coords = llmResponse.output();
-    
-    if (!coords) {
-        throw new Error('Could not geocode address.');
+    // The history contains the tool requests and responses.
+    const toolResponse = llmResponse.history()[0].toolRequest.output;
+
+    if (!toolResponse) {
+        throw new Error('Could not geocode address. The tool did not return a valid response.');
     }
+    const coords = toolResponse as {lat: number, lng: number};
+
 
     const geohash = geohashForLocation(coords.lat, coords.lng);
 
