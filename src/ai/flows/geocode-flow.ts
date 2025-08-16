@@ -38,21 +38,32 @@ const getCoordinatesTool = ai.defineTool(
         }),
     },
     async (input) => {
-        // In a real app, you would call a geocoding API like Google Maps here.
-        // For this example, we'll use a simple mock that is more realistic.
-        console.log(`Geocoding address (mock): ${input.address}`);
-        const lowerCaseAddress = input.address.toLowerCase();
-        if (lowerCaseAddress.includes('vancouver')) {
-            return { lat: 49.2827, lng: -123.1207 };
+        // Use a real geocoding API. Nominatim is free and doesn't require an API key.
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input.address)}&format=json&limit=1`;
+        
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'EQPMGRshop-Studio-App/1.0'
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`Geocoding API failed with status: ${response.status}`);
+            }
+            const data = await response.json();
+            if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat);
+                const lng = parseFloat(data[0].lon);
+                console.log(`Geocoded address '${input.address}' to:`, { lat, lng });
+                return { lat, lng };
+            } else {
+                throw new Error('No results found for the address.');
+            }
+        } catch (error) {
+            console.error('Error calling Geocoding API:', error);
+            // Fallback for safety, but the real API should be the primary source.
+            return { lat: 37.7749, lng: -122.4194 }; 
         }
-        if (lowerCaseAddress.includes('san francisco')) {
-            return { lat: 37.7749, lng: -122.4194 };
-        }
-        if (lowerCaseAddress.includes('los angeles')) {
-            return { lat: 34.0522, lng: -118.2437 };
-        }
-        // Default to SF for other addresses
-        return { lat: 37.7749, lng: -122.4194 };
     }
 );
 
@@ -69,7 +80,7 @@ Use the getCoordinates tool to find the latitude and longitude for the following
 After using the tool, you MUST output the latitude and longitude in the required JSON format. Do not add any commentary or additional text.`,
 });
 
-// A simple geohash implementation since we removed the external dependency.
+// A simple geohash implementation.
 const geohashForLocation = (lat: number, lon: number, precision: number = 9): string => {
     const BITS = [16, 8, 4, 2, 1];
     const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
@@ -120,23 +131,15 @@ const geocodeFlow = ai.defineFlow(
     outputSchema: GeocodeOutputSchema,
   },
   async (address) => {
-    const llmResponse = await geocodePrompt(address);
-    const coords = llmResponse.output;
-
-    if (!coords) {
-        // If the LLM fails to extract, try calling the tool directly.
-        const toolResponse = await getCoordinatesTool({ address });
-        if (toolResponse) {
-             const geohash = geohashForLocation(toolResponse.lat, toolResponse.lng);
-             return { ...toolResponse, geohash };
-        }
-        throw new Error('Could not geocode address. The tool did not return a valid response.');
+    const toolResponse = await getCoordinatesTool({ address });
+    if (!toolResponse) {
+      throw new Error('Could not geocode address. The tool did not return a valid response.');
     }
-
-    const geohash = geohashForLocation(coords.lat, coords.lng);
+    
+    const geohash = geohashForLocation(toolResponse.lat, toolResponse.lng);
 
     return {
-      ...coords,
+      ...toolResponse,
       geohash,
     };
   }
