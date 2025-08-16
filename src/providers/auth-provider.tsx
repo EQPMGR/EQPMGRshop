@@ -2,8 +2,9 @@
 
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -33,12 +34,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return signInWithEmailAndPassword(auth, email, pass);
   };
 
-  const signup = async (email: string, pass: string, name: string) => {
+  const signup = async (email: string, pass: string, shopName: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    if (auth.currentUser) {
-      await sendEmailVerification(auth.currentUser);
+    const newUser = userCredential.user;
+
+    if (newUser) {
+      // Create a document in the 'users' collection
+      await setDoc(doc(db, "users", newUser.uid), {
+        uid: newUser.uid,
+        email: newUser.email,
+        shopName: shopName,
+        createdAt: new Date()
+      });
+
+      // Send verification email
+      await sendEmailVerification(newUser);
     }
-    // In a real app, you would also save the user's name/shop name to a database
+    
     return userCredential;
   };
   
