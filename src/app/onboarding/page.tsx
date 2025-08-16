@@ -57,8 +57,9 @@ export default function OnboardingPage() {
     const [selectedCountry, setSelectedCountry] = useState<string>('');
     
 
-    const { control, handleSubmit, watch, formState: { errors }, reset } = useForm<OnboardingFormValues>({
+    const { control, handleSubmit, watch, formState: { errors, isValid }, reset } = useForm<OnboardingFormValues>({
         resolver: zodResolver(onboardingSchema),
+        mode: 'onChange', // Enable validation on change
         defaultValues: {
             shopName: '',
             streetAddress: '',
@@ -313,7 +314,7 @@ export default function OnboardingPage() {
                             </Alert>
                         )}
 
-                        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={loading}>
+                        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={!isValid || loading}>
                             {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Shop Information'}
                         </Button>
                     </form>
