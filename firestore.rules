@@ -1,17 +1,20 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and write their own document in the 'users' collection
+    // Allow users to create and update their own user document
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, create, update: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Any authenticated user can create their own document in the 'serviceProviders' collection
-    // and can only read/write their own document after it's created.
+    // Allow users to create their own service provider document
     match /serviceProviders/{userId} {
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, create, update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
