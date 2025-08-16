@@ -10,7 +10,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { geohashForLocation, geohashQueryBounds, distanceBetween } from 'geofire-common';
+
+// Note: The 'geofire-common' dependency has been removed.
+// Geohash generation is now handled by a local function.
 
 const GeocodeInputSchema = z.string().describe("The full address to geocode.");
 export type GeocodeInput = z.infer<typeof GeocodeInputSchema>;
@@ -26,7 +28,7 @@ export async function getGeohash(input: GeocodeInput): Promise<GeocodeOutput> {
   return geocodeFlow(input);
 }
 
-const geocodeTool = ai.defineTool(
+const getCoordinatesTool = ai.defineTool(
     {
         name: 'getCoordinates',
         description: 'Get the latitude and longitude for a given address.',
@@ -48,13 +50,57 @@ const geocodeTool = ai.defineTool(
 );
 
 
-const prompt = ai.definePrompt({
+const geocodePrompt = ai.definePrompt({
   name: 'geocodePrompt',
   input: { schema: GeocodeInputSchema },
   output: { schema: z.object({ lat: z.number(), lng: z.number() }) },
-  tools: [geocodeTool],
+  tools: [getCoordinatesTool],
   prompt: `Use the getCoordinates tool to find the latitude and longitude for the following address: {{{input}}}`,
 });
+
+// A simple geohash implementation since we removed the external dependency.
+const geohashForLocation = (lat: number, lon: number, precision: number = 9): string => {
+    const BITS = [16, 8, 4, 2, 1];
+    const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+    let geohash = "";
+    let is_even = true;
+    let lat_range = [-90.0, 90.0];
+    let lon_range = [-180.0, 180.0];
+    let bit = 0;
+    let ch = 0;
+
+    while (geohash.length < precision) {
+        let mid;
+        if (is_even) {
+            mid = (lon_range[0] + lon_range[1]) / 2;
+            if (lon > mid) {
+                ch |= BITS[bit];
+                lon_range[0] = mid;
+            } else {
+                lon_range[1] = mid;
+            }
+        } else {
+            mid = (lat_range[0] + lat_range[1]) / 2;
+            if (lat > mid) {
+                ch |= BITS[bit];
+                lat_range[0] = mid;
+            } else {
+                lat_range[1] = mid;
+            }
+        }
+
+        is_even = !is_even;
+        if (bit < 4) {
+            bit++;
+        } else {
+            geohash += BASE32[ch];
+            bit = 0;
+            ch = 0;
+        }
+    }
+    return geohash;
+};
+
 
 const geocodeFlow = ai.defineFlow(
   {
@@ -63,14 +109,14 @@ const geocodeFlow = ai.defineFlow(
     outputSchema: GeocodeOutputSchema,
   },
   async (address) => {
-    const llmResponse = await prompt(address);
+    const llmResponse = await geocodePrompt(address);
     const coords = llmResponse.output();
     
     if (!coords) {
         throw new Error('Could not geocode address.');
     }
 
-    const geohash = geohashForLocation([coords.lat, coords.lng]);
+    const geohash = geohashForLocation(coords.lat, coords.lng);
 
     return {
       ...coords,
