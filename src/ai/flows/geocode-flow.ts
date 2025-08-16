@@ -39,9 +39,12 @@ const getCoordinatesTool = ai.defineTool(
     },
     async (input) => {
         // In a real app, you would call a geocoding API like Google Maps here.
-        // For this example, we'll use a simple mock.
+        // For this example, we'll use a simple mock that is more realistic.
         console.log(`Geocoding address (mock): ${input.address}`);
-        // This is a mock response and will not be accurate.
+        if (input.address.toLowerCase().includes('vancouver')) {
+            return { lat: 49.2827, lng: -123.1207 };
+        }
+        // Default to SF for other addresses
         return { lat: 37.7749, lng: -122.4194 };
     }
 );
@@ -114,6 +117,12 @@ const geocodeFlow = ai.defineFlow(
     const coords = llmResponse.output;
 
     if (!coords) {
+        // If the LLM fails to extract, try calling the tool directly.
+        const toolResponse = await getCoordinatesTool({ address });
+        if (toolResponse) {
+             const geohash = geohashForLocation(toolResponse.lat, toolResponse.lng);
+             return { ...toolResponse, geohash };
+        }
         throw new Error('Could not geocode address. The tool did not return a valid response.');
     }
 

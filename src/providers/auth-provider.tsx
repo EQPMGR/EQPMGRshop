@@ -1,11 +1,11 @@
 
 'use client';
 
-import { createContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -13,7 +13,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<any>;
   signup: (email: string, pass: string, name: string) => Promise<any>;
   logout: () => void;
-  onboardingComplete: boolean | null;
+  onboardingComplete: boolean;
   shopName: string | null;
 }
 
@@ -22,33 +22,41 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean>(false);
   const [shopName, setShopName] = useState<string | null>(null);
   const router = useRouter();
 
+  const handleUserDocSnapshot = useCallback((docSnap: any) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      setOnboardingComplete(data.onboardingComplete || false);
+      setShopName(data.shopName || null);
+    } else {
+      // This case handles a new user that doesn't have a doc yet.
+      setOnboardingComplete(false);
+      setShopName(null);
+    }
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setUser(user);
       if (user) {
+        setLoading(true);
         const userDocRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setOnboardingComplete(data.onboardingComplete || false);
-          setShopName(data.shopName || null);
-        } else {
-          setOnboardingComplete(false);
-          setShopName(null);
-        }
+        const unsubscribeFirestore = onSnapshot(userDocRef, handleUserDocSnapshot);
+        return () => unsubscribeFirestore(); // Cleanup Firestore listener
       } else {
-        setOnboardingComplete(null);
+        // No user, reset state
+        setOnboardingComplete(false);
         setShopName(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => unsubscribeAuth(); // Cleanup auth listener
+  }, [handleUserDocSnapshot]);
 
   const login = (email: string, pass: string) => {
     return signInWithEmailAndPassword(auth, email, pass);
@@ -59,13 +67,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const newUser = userCredential.user;
 
     if (newUser) {
-      await setDoc(doc(db, "users", newUser.uid), {
+      const userData = {
         uid: newUser.uid,
         email: newUser.email,
         shopName: shopName,
         createdAt: new Date(),
         onboardingComplete: false, // Explicitly set to false on signup
-      });
+      };
+      await setDoc(doc(db, "users", newUser.uid), userData);
+      
+      // Manually update local state after signup to prevent redirect loop
+      setOnboardingComplete(false);
+      setShopName(shopName);
+
       await sendEmailVerification(newUser);
     }
     
