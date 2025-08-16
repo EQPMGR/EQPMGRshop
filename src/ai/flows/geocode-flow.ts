@@ -11,9 +11,6 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-// Note: The 'geofire-common' dependency has been removed.
-// Geohash generation is now handled by a local function.
-
 const GeocodeInputSchema = z.string().describe("The full address to geocode.");
 export type GeocodeInput = z.infer<typeof GeocodeInputSchema>;
 
@@ -114,14 +111,11 @@ const geocodeFlow = ai.defineFlow(
   },
   async (address) => {
     const llmResponse = await geocodePrompt(address);
-    // The history contains the tool requests and responses.
-    const toolResponse = llmResponse.history()[0].toolRequest.output;
+    const coords = llmResponse.output();
 
-    if (!toolResponse) {
+    if (!coords) {
         throw new Error('Could not geocode address. The tool did not return a valid response.');
     }
-    const coords = toolResponse as {lat: number, lng: number};
-
 
     const geohash = geohashForLocation(coords.lat, coords.lng);
 
