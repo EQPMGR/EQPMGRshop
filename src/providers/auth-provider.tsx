@@ -1,10 +1,11 @@
+
 'use client';
 
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +13,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<any>;
   signup: (email: string, pass: string, name: string) => Promise<any>;
   logout: () => void;
+  onboardingComplete: boolean | null;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,11 +21,23 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+      if (user) {
+        const userDocRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          setOnboardingComplete(docSnap.data().onboardingComplete || false);
+        } else {
+          setOnboardingComplete(false);
+        }
+      } else {
+        setOnboardingComplete(null);
+      }
       setLoading(false);
     });
 
@@ -39,15 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const newUser = userCredential.user;
 
     if (newUser) {
-      // Create a document in the 'users' collection
       await setDoc(doc(db, "users", newUser.uid), {
         uid: newUser.uid,
         email: newUser.email,
         shopName: shopName,
-        createdAt: new Date()
+        createdAt: new Date(),
+        onboardingComplete: false, // Explicitly set to false on signup
       });
-
-      // Send verification email
       await sendEmailVerification(newUser);
     }
     
@@ -66,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     signup,
     logout,
+    onboardingComplete,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
