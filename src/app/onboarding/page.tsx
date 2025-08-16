@@ -35,15 +35,15 @@ const onboardingSchema = z.object({
 type OnboardingFormValues = z.infer<typeof onboardingSchema>;
 
 export default function OnboardingPage() {
-    const { user, loading: authLoading } = useAuth();
+    const { user, loading: authLoading, shopName } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [selectedCountry, setSelectedCountry] = useState<string>('');
-    const states = getStates(selectedCountry);
+    
 
-    const { control, handleSubmit, watch, formState: { errors } } = useForm<OnboardingFormValues>({
+    const { control, handleSubmit, watch, formState: { errors }, reset } = useForm<OnboardingFormValues>({
         resolver: zodResolver(onboardingSchema),
         defaultValues: {
             shopName: '',
@@ -57,7 +57,14 @@ export default function OnboardingPage() {
         }
     });
 
+    const states = getStates(selectedCountry);
     const watchedCountry = watch("country");
+
+    useEffect(() => {
+        if (shopName) {
+            reset({ shopName: shopName });
+        }
+    }, [shopName, reset]);
 
     useEffect(() => {
         if (watchedCountry) {
@@ -297,5 +304,3 @@ export default function OnboardingPage() {
         </main>
     );
 }
-
-    

@@ -14,6 +14,7 @@ interface AuthContextType {
   signup: (email: string, pass: string, name: string) => Promise<any>;
   logout: () => void;
   onboardingComplete: boolean | null;
+  shopName: string | null;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  const [shopName, setShopName] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -31,12 +33,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userDocRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(userDocRef);
         if (docSnap.exists()) {
-          setOnboardingComplete(docSnap.data().onboardingComplete || false);
+          const data = docSnap.data();
+          setOnboardingComplete(data.onboardingComplete || false);
+          setShopName(data.shopName || null);
         } else {
           setOnboardingComplete(false);
+          setShopName(null);
         }
       } else {
         setOnboardingComplete(null);
+        setShopName(null);
       }
       setLoading(false);
     });
@@ -79,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signup,
     logout,
     onboardingComplete,
+    shopName,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
