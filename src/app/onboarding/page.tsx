@@ -15,14 +15,19 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Textarea } from '@/components/ui/textarea';
 import { doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getGeohash } from '@/ai/flows/geocode-flow';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { countries, getStates } from '@/lib/countries';
 
 const onboardingSchema = z.object({
     shopName: z.string().min(1, "Shop name is required"),
-    address: z.string().min(1, "Address is required"),
+    streetAddress: z.string().min(1, "Street address is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(1, "State/Province is required"),
+    country: z.string().min(1, "Country is required"),
+    postalCode: z.string().min(1, "Postal/Zip code is required"),
     phone: z.string().min(1, "Phone number is required"),
     services: z.enum(["repairs", "rentals", "fitting"]),
 });
@@ -35,16 +40,30 @@ export default function OnboardingPage() {
     const { toast } = useToast();
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [selectedCountry, setSelectedCountry] = useState<string>('');
+    const states = getStates(selectedCountry);
 
-    const { control, handleSubmit, formState: { errors } } = useForm<OnboardingFormValues>({
+    const { control, handleSubmit, watch, formState: { errors } } = useForm<OnboardingFormValues>({
         resolver: zodResolver(onboardingSchema),
         defaultValues: {
             shopName: '',
-            address: '',
+            streetAddress: '',
+            city: '',
+            state: '',
+            country: '',
+            postalCode: '',
             phone: '',
             services: 'repairs',
         }
     });
+
+    const watchedCountry = watch("country");
+
+    useEffect(() => {
+        if (watchedCountry) {
+            setSelectedCountry(watchedCountry);
+        }
+    }, [watchedCountry]);
 
     const onSubmit = async (data: OnboardingFormValues) => {
         if (!user) {
@@ -55,33 +74,38 @@ export default function OnboardingPage() {
         setLoading(true);
         setError(null);
 
+        const fullAddress = `${data.streetAddress}, ${data.city}, ${data.state}, ${data.country}, ${data.postalCode}`;
+
         try {
             // 1. Get geohash for the address
-            const geoData = await getGeohash(data.address);
+            const geoData = await getGeohash(fullAddress);
 
-            // 2. Update the user document
-            const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, {
+            const shopData = {
                 shopName: data.shopName,
-                address: data.address,
+                address: fullAddress,
+                streetAddress: data.streetAddress,
+                city: data.city,
+                state: data.state,
+                country: data.country,
+                postalCode: data.postalCode,
                 phone: data.phone,
                 services: data.services,
                 geohash: geoData.geohash,
                 lat: geoData.lat,
                 lng: geoData.lng,
+            }
+
+            // 2. Update the user document
+            const userRef = doc(db, "users", user.uid);
+            await updateDoc(userRef, {
+                ...shopData,
                 onboardingComplete: true
             });
 
             // 3. Create a new document in serviceProviders
             const serviceProviderRef = doc(db, "serviceProviders", user.uid);
             await setDoc(serviceProviderRef, {
-                shopName: data.shopName,
-                address: data.address,
-                phone: data.phone,
-                services: data.services,
-                geohash: geoData.geohash,
-                lat: geoData.lat,
-                lng: geoData.lng,
+                ...shopData,
                 ownerId: user.uid,
             });
 
@@ -133,7 +157,7 @@ export default function OnboardingPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="shopName">Shop Name</Label>
                             <Controller
@@ -144,14 +168,78 @@ export default function OnboardingPage() {
                             {errors.shopName && <p className="text-sm text-destructive">{errors.shopName.message}</p>}
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="address">Full Shop Address</Label>
-                            <Controller
-                                name="address"
+                         <div className="space-y-2">
+                            <Label htmlFor="streetAddress">Street Address</Label>
+                             <Controller
+                                name="streetAddress"
                                 control={control}
-                                render={({ field }) => <Textarea id="address" placeholder="123 Main St, Anytown, USA 12345" {...field} />}
+                                render={({ field }) => <Input id="streetAddress" placeholder="123 Main St" {...field} />}
                             />
-                            {errors.address && <p className="text-sm text-destructive">{errors.address.message}</p>}
+                            {errors.streetAddress && <p className="text-sm text-destructive">{errors.streetAddress.message}</p>}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div className="space-y-2">
+                                <Label htmlFor="city">City</Label>
+                                 <Controller
+                                    name="city"
+                                    control={control}
+                                    render={({ field }) => <Input id="city" placeholder="Anytown" {...field} />}
+                                />
+                                {errors.city && <p className="text-sm text-destructive">{errors.city.message}</p>}
+                            </div>
+                           <div className="space-y-2">
+                                <Label htmlFor="country">Country</Label>
+                                 <Controller
+                                    name="country"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <SelectTrigger id="country">
+                                                <SelectValue placeholder="Select Country" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {countries.map((country) => (
+                                                    <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                />
+                                {errors.country && <p className="text-sm text-destructive">{errors.country.message}</p>}
+                            </div>
+                        </div>
+
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div className="space-y-2">
+                                <Label htmlFor="state">Province/State</Label>
+                                 <Controller
+                                    name="state"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedCountry}>
+                                            <SelectTrigger id="state">
+                                                <SelectValue placeholder={selectedCountry ? "Select Province/State" : "Select Country First"} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {states.map((state) => (
+                                                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                />
+                                {errors.state && <p className="text-sm text-destructive">{errors.state.message}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="postalCode">Postal/Zip Code</Label>
+                                <Controller
+                                    name="postalCode"
+                                    control={control}
+                                    render={({ field }) => <Input id="postalCode" placeholder="12345" {...field} />}
+                                />
+                                {errors.postalCode && <p className="text-sm text-destructive">{errors.postalCode.message}</p>}
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -209,3 +297,5 @@ export default function OnboardingPage() {
         </main>
     );
 }
+
+    
