@@ -14,12 +14,12 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getGeohash } from '@/ai/flows/geocode-flow';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { countries, getStates } from '@/lib/countries';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const onboardingSchema = z.object({
     shopName: z.string().min(1, "Shop name is required"),
@@ -29,10 +29,24 @@ const onboardingSchema = z.object({
     country: z.string().min(1, "Country is required"),
     postalCode: z.string().min(1, "Postal/Zip code is required"),
     phone: z.string().min(1, "Phone number is required"),
-    services: z.enum(["repairs", "rentals", "fitting"]),
+    services: z.object({
+        repairs: z.boolean().default(false),
+        rentals: z.boolean().default(false),
+        fitting: z.boolean().default(false),
+    }).refine(data => data.repairs || data.rentals || data.fitting, {
+        message: "Please select at least one service.",
+        path: ['repairs'], // Assign error to one of the checkboxes
+    }),
 });
 
 type OnboardingFormValues = z.infer<typeof onboardingSchema>;
+
+const serviceOptions = [
+    { id: 'repairs', label: 'Bicycle Repairs' },
+    { id: 'rentals', label: 'Bicycle Rental' },
+    { id: 'fitting', label: 'Bike Fit Services' },
+] as const;
+
 
 export default function OnboardingPage() {
     const { user, loading: authLoading, shopName } = useAuth();
@@ -53,7 +67,11 @@ export default function OnboardingPage() {
             country: '',
             postalCode: '',
             phone: '',
-            services: 'repairs',
+            services: {
+                repairs: false,
+                rentals: false,
+                fitting: false,
+            },
         }
     });
 
@@ -82,6 +100,10 @@ export default function OnboardingPage() {
         setError(null);
 
         const fullAddress = `${data.streetAddress}, ${data.city}, ${data.state}, ${data.country}, ${data.postalCode}`;
+        
+        const selectedServices = Object.entries(data.services)
+            .filter(([, value]) => value)
+            .map(([key]) => key);
 
         try {
             // 1. Get geohash for the address
@@ -96,7 +118,7 @@ export default function OnboardingPage() {
                 country: data.country,
                 postalCode: data.postalCode,
                 phone: data.phone,
-                services: data.services,
+                services: selectedServices,
                 geohash: geoData.geohash,
                 lat: geoData.lat,
                 lng: geoData.lng,
@@ -260,31 +282,27 @@ export default function OnboardingPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Primary Service</Label>
-                            <Controller
-                                name="services"
-                                control={control}
-                                render={({ field }) => (
-                                    <RadioGroup
-                                        onValueChange={field.onChange}
-                                        defaultValue={field.value}
-                                        className="flex flex-col space-y-1"
-                                    >
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="repairs" id="repairs" />
-                                            <Label htmlFor="repairs">Bicycle Repairs</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="rentals" id="rentals" />
-                                            <Label htmlFor="rentals">Bicycle Rental</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="fitting" id="fitting" />
-                                            <Label htmlFor="fitting">Bike Fit Services</Label>
-                                        </div>
-                                    </RadioGroup>
-                                )}
-                            />
+                            <Label>Services Offered</Label>
+                            <div className="flex flex-col space-y-2">
+                                {serviceOptions.map(item => (
+                                    <Controller
+                                        key={item.id}
+                                        name={`services.${item.id}`}
+                                        control={control}
+                                        render={({ field }) => (
+                                            <div className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                    id={item.id}
+                                                />
+                                                <Label htmlFor={item.id} className="font-normal">{item.label}</Label>
+                                            </div>
+                                        )}
+                                    />
+                                ))}
+                            </div>
+                            {errors.services?.root && <p className="text-sm text-destructive">{errors.services.root.message}</p>}
                         </div>
 
                         {error && (
