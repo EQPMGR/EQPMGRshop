@@ -304,6 +304,7 @@ export default function OnboardingPage() {
                                 ))}
                             </div>
                             {errors.services?.root && <p className="text-sm text-destructive">{errors.services.root.message}</p>}
+                            {errors.services && !errors.services.root && <p className="text-sm text-destructive">{errors.services.repairs?.message}</p>}
                         </div>
 
                         {error && (
