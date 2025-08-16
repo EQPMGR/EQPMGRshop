@@ -28,7 +28,7 @@ export async function getGeohash(input: GeocodeInput): Promise<GeocodeOutput> {
 const getCoordinatesTool = ai.defineTool(
     {
         name: 'getCoordinates',
-        description: 'Get the latitude and longitude for a given address.',
+        description: 'Get the latitude and longitude for a given address using Google Geocoding API.',
         inputSchema: z.object({
             address: z.string().describe('The address to get coordinates for.'),
         }),
@@ -38,31 +38,29 @@ const getCoordinatesTool = ai.defineTool(
         }),
     },
     async (input) => {
-        // Use a real geocoding API. Nominatim is free and doesn't require an API key.
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input.address)}&format=json&limit=1`;
+        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY;
+        if (!apiKey) {
+            throw new Error('Google Geocoding API key is missing.');
+        }
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(input.address)}&key=${apiKey}`;
         
         try {
-            const response = await fetch(url, {
-                headers: {
-                    'User-Agent': 'EQPMGRshop-Studio-App/1.0'
-                }
-            });
+            const response = await fetch(url);
             if (!response.ok) {
-                throw new Error(`Geocoding API failed with status: ${response.status}`);
+                throw new Error(`Google Geocoding API failed with status: ${response.status}`);
             }
             const data = await response.json();
-            if (data && data.length > 0) {
-                const lat = parseFloat(data[0].lat);
-                const lng = parseFloat(data[0].lon);
+            if (data.status === 'OK' && data.results && data.results.length > 0) {
+                const location = data.results[0].geometry.location;
+                const { lat, lng } = location;
                 console.log(`Geocoded address '${input.address}' to:`, { lat, lng });
                 return { lat, lng };
             } else {
-                throw new Error('No results found for the address.');
+                 throw new Error(`Geocoding failed: ${data.status} - ${data.error_message || 'No results found.'}`);
             }
         } catch (error) {
-            console.error('Error calling Geocoding API:', error);
-            // Fallback for safety, but the real API should be the primary source.
-            return { lat: 37.7749, lng: -122.4194 }; 
+            console.error('Error calling Google Geocoding API:', error);
+            throw new Error('Failed to fetch coordinates from Google Geocoding API.');
         }
     }
 );
@@ -144,3 +142,4 @@ const geocodeFlow = ai.defineFlow(
     };
   }
 );
+
