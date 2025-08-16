@@ -38,9 +38,9 @@ const getCoordinatesTool = ai.defineTool(
         }),
     },
     async (input) => {
-        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY;
+        const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            throw new Error('Google Geocoding API key is missing.');
+            throw new Error('Google Geocoding API key (GEMINI_API_KEY) is missing.');
         }
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(input.address)}&key=${apiKey}`;
         
