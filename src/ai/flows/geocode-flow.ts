@@ -111,7 +111,7 @@ const geocodeFlow = ai.defineFlow(
   },
   async (address) => {
     const llmResponse = await geocodePrompt(address);
-    const coords = llmResponse.output();
+    const coords = llmResponse.output;
 
     if (!coords) {
         throw new Error('Could not geocode address. The tool did not return a valid response.');
