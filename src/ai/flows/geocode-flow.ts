@@ -41,8 +41,15 @@ const getCoordinatesTool = ai.defineTool(
         // In a real app, you would call a geocoding API like Google Maps here.
         // For this example, we'll use a simple mock that is more realistic.
         console.log(`Geocoding address (mock): ${input.address}`);
-        if (input.address.toLowerCase().includes('vancouver')) {
+        const lowerCaseAddress = input.address.toLowerCase();
+        if (lowerCaseAddress.includes('vancouver')) {
             return { lat: 49.2827, lng: -123.1207 };
+        }
+        if (lowerCaseAddress.includes('san francisco')) {
+            return { lat: 37.7749, lng: -122.4194 };
+        }
+        if (lowerCaseAddress.includes('los angeles')) {
+            return { lat: 34.0522, lng: -118.2437 };
         }
         // Default to SF for other addresses
         return { lat: 37.7749, lng: -122.4194 };
@@ -59,7 +66,7 @@ const geocodePrompt = ai.definePrompt({
 
 Use the getCoordinates tool to find the latitude and longitude for the following address: {{{input}}}
 
-After using the tool, you MUST output the latitude and longitude in the required JSON format.`,
+After using the tool, you MUST output the latitude and longitude in the required JSON format. Do not add any commentary or additional text.`,
 });
 
 // A simple geohash implementation since we removed the external dependency.
