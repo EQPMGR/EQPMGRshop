@@ -149,7 +149,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-primary">Shop Details</CardTitle>
-          <CardDescription>Update your shop's public information. This is where geohashing is applied to your location.</CardDescription>
+          <CardDescription>Update your shop's public information.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
@@ -157,11 +157,11 @@ export default function SettingsPage() {
                 <Label>Shop Logo</Label>
                 <div className="flex items-center gap-4">
                      <div 
-                        className="relative h-24 w-24 rounded-full border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary"
+                        className="relative h-24 w-24 rounded-md border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary"
                         onClick={() => fileInputRef.current?.click()}
                      >
                         {logoPreview ? (
-                            <Image src={logoPreview} alt="Logo Preview" layout="fill" className="rounded-full object-cover"/>
+                            <Image src={logoPreview} alt="Logo Preview" layout="fill" className="rounded-md object-cover"/>
                         ) : (
                             <div className="text-center text-muted-foreground">
                                 <UploadCloud className="mx-auto h-8 w-8"/>
