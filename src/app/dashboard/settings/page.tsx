@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { countries, getStates } from "@/lib/countries";
 import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import { getGeohash } from "@/ai/flows/geocode-flow";
-import { Loader2 } from "lucide-react";
+import { Loader2, UploadCloud } from "lucide-react";
 
 export default function SettingsPage() {
     const { user } = useAuth();
@@ -27,11 +29,15 @@ export default function SettingsPage() {
         postalCode: '',
         phone: '',
         website: '',
+        logoUrl: '',
     });
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [selectedCountry, setSelectedCountry] = useState<string>('');
     const states = getStates(selectedCountry);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const fetchShopData = async () => {
@@ -49,8 +55,12 @@ export default function SettingsPage() {
                         postalCode: data.postalCode || '',
                         phone: data.phone || '',
                         website: data.website || '',
+                        logoUrl: data.logoUrl || '',
                     });
                     setSelectedCountry(data.country || '');
+                    if (data.logoUrl) {
+                        setLogoPreview(data.logoUrl);
+                    }
                 }
             }
             setLoading(false);
@@ -62,6 +72,14 @@ export default function SettingsPage() {
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { id, value } = e.target;
         setShopData(prev => ({ ...prev, [id]: value }));
+    };
+    
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setLogoFile(file);
+            setLogoPreview(URL.createObjectURL(file));
+        }
     };
 
     const handleSelectChange = (id: string, value: string) => {
@@ -81,11 +99,19 @@ export default function SettingsPage() {
 
         setSaving(true);
         try {
+            let logoUrl = shopData.logoUrl;
+            if (logoFile) {
+                const storageRef = ref(storage, `logos/${user.uid}/${logoFile.name}`);
+                await uploadBytes(storageRef, logoFile);
+                logoUrl = await getDownloadURL(storageRef);
+            }
+
             const fullAddress = `${shopData.streetAddress}, ${shopData.city}, ${shopData.state}, ${shopData.country}, ${shopData.postalCode}`;
             const geoData = await getGeohash(fullAddress);
 
             const updatedData = {
                 ...shopData,
+                logoUrl,
                 address: fullAddress,
                 geohash: geoData.geohash,
                 lat: geoData.lat,
@@ -127,6 +153,37 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+                <Label>Shop Logo</Label>
+                <div className="flex items-center gap-4">
+                     <div 
+                        className="relative h-24 w-24 rounded-full border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary"
+                        onClick={() => fileInputRef.current?.click()}
+                     >
+                        {logoPreview ? (
+                            <Image src={logoPreview} alt="Logo Preview" layout="fill" className="rounded-full object-cover"/>
+                        ) : (
+                            <div className="text-center text-muted-foreground">
+                                <UploadCloud className="mx-auto h-8 w-8"/>
+                                <span className="text-xs">Upload</span>
+                            </div>
+                        )}
+                         <Input
+                            id="logo"
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept="image/png, image/jpeg, image/gif"
+                            onChange={handleLogoChange}
+                        />
+                     </div>
+                     <div className="text-sm text-muted-foreground">
+                        <p>Recommended size: 100x100px.</p>
+                        <p>Max file size: 1MB.</p>
+                     </div>
+                </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="shopName">Shop Name</Label>
               <Input id="shopName" value={shopData.shopName} onChange={handleInputChange} />
@@ -221,4 +278,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
