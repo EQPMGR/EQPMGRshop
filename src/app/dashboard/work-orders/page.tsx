@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot, DocumentData } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -12,24 +15,18 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type WorkOrder = {
   id: string;
-  customer: string;
+  customerName: string;
   bike: string;
-  issue: string;
-  received: string;
+  issueDescription: string;
+  createdAt: string;
   status: "New" | "In Progress" | "Awaiting Parts" | "Completed";
   priority?: "Low" | "Medium" | "High";
   priorityLoading?: boolean;
 };
-
-const initialWorkOrders: WorkOrder[] = [
-  { id: 'WO-001', customer: 'Alice Johnson', bike: 'Trek Madone', issue: 'Brake adjustment', received: '2024-07-20', status: 'New' },
-  { id: 'WO-002', customer: 'Bob Williams', bike: 'Specialized Stumpjumper', issue: 'Suspension service', received: '2024-07-19', status: 'In Progress' },
-  { id: 'WO-003', customer: 'Charlie Brown', bike: 'Cannondale Synapse', issue: 'Flat tire', received: '2024-07-19', status: 'Completed' },
-  { id: 'WO-004', customer: 'Diana Prince', bike: 'Giant TCR', issue: 'Derailleur replacement', received: '2024-07-18', status: 'Awaiting Parts' },
-];
 
 const statusVariant: { [key in WorkOrder['status']]: "default" | "secondary" | "destructive" | "outline" } = {
   "New": "default",
@@ -44,9 +41,42 @@ const priorityVariant: { [key in NonNullable<WorkOrder['priority']>]: "default" 
   "High": "destructive"
 };
 
-
 export default function WorkOrdersPage() {
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>(initialWorkOrders);
+  const { user } = useAuth();
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    };
+
+    setLoading(true);
+    const q = query(collection(db, "workOrders"), where("serviceProviderId", "==", user.uid));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const orders: WorkOrder[] = [];
+      querySnapshot.forEach((doc: DocumentData) => {
+        const data = doc.data();
+        orders.push({
+          id: doc.id,
+          customerName: data.customerName || 'N/A',
+          bike: data.bike || 'N/A',
+          issueDescription: data.issueDescription || 'No description',
+          createdAt: data.createdAt?.toDate().toLocaleDateString() || 'N/A',
+          status: data.status || 'New',
+        });
+      });
+      setWorkOrders(orders);
+      setLoading(false);
+    }, (error) => {
+        console.error("Error fetching work orders: ", error);
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const handleGetPriority = (id: string) => {
     setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, priorityLoading: true } : wo));
@@ -70,62 +100,73 @@ export default function WorkOrdersPage() {
       </div>
       
       <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead>Bike</TableHead>
-              <TableHead>Issue</TableHead>
-              <TableHead>Received</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>AI Priority</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {workOrders.map((order) => (
-              <TableRow key={order.id}>
-                <TableCell className="font-medium">{order.customer}</TableCell>
-                <TableCell>{order.bike}</TableCell>
-                <TableCell>{order.issue}</TableCell>
-                <TableCell>{order.received}</TableCell>
-                <TableCell>
-                  <Badge variant={statusVariant[order.status]}>{order.status}</Badge>
-                </TableCell>
-                <TableCell>
-                  {order.priority ? (
-                     <Badge variant={priorityVariant[order.priority]}>{order.priority}</Badge>
-                  ) : (
-                    <Button variant="ghost" size="sm" onClick={() => handleGetPriority(order.id)} disabled={order.priorityLoading}>
-                      {order.priorityLoading ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="mr-2 h-4 w-4 text-accent" />
-                      )}
-                      Get Priority
-                    </Button>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem>View Details</DropdownMenuItem>
-                      <DropdownMenuItem>Update Status</DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-500">Cancel Order</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+         {loading ? (
+           <div className="flex items-center justify-center p-8">
+             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+           </div>
+         ) : workOrders.length === 0 ? (
+            <div className="text-center p-8 text-muted-foreground">
+                <p>No work orders found.</p>
+                <p className="text-sm">When an athlete submits a work order for your shop, it will appear here.</p>
+            </div>
+         ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Customer</TableHead>
+                <TableHead>Bike</TableHead>
+                <TableHead>Issue</TableHead>
+                <TableHead>Received</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>AI Priority</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {workOrders.map((order) => (
+                <TableRow key={order.id}>
+                  <TableCell className="font-medium">{order.customerName}</TableCell>
+                  <TableCell>{order.bike}</TableCell>
+                  <TableCell>{order.issueDescription}</TableCell>
+                  <TableCell>{order.createdAt}</TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant[order.status]}>{order.status}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {order.priority ? (
+                      <Badge variant={priorityVariant[order.priority]}>{order.priority}</Badge>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => handleGetPriority(order.id)} disabled={order.priorityLoading}>
+                        {order.priorityLoading ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-2 h-4 w-4 text-accent" />
+                        )}
+                        Get Priority
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem>Update Status</DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-500">Cancel Order</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </div>
   );
