@@ -3,32 +3,48 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Users can only read and write their own data.
-    match /users/{userId} {
+    // Users can only read/write their own data, including the nested equipment and components subcollections.
+    match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Service providers can be read by anyone (for the directory)
-    // but only written to by the owner.
+
+    // Grant read and write access to equipment data only if the user ID matches the userId field in the equipment document.
+    match /equipment/{equipmentId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // A user can read a work order if they are the service provider OR the user who created it.
+    // A user can create a work order if they are authenticated.
+    // A user can update a work order if they are the service provider.
+    match /workOrders/{orderId} {
+        allow read: if request.auth != null && (request.auth.uid == resource.data.serviceProviderId || request.auth.uid == resource.data.userId);
+        allow create: if request.auth != null;
+        allow update: if request.auth != null && request.auth.uid == resource.data.serviceProviderId;
+    }
+
+    // Authenticated users can read the global data.
+    match /bikeModels/{bikeId} {
+      allow read: if request.auth != null;
+    }
     match /serviceProviders/{providerId} {
-      allow read;
-      allow write: if request.auth != null && request.auth.uid == providerId;
+        allow read: if request.auth != null;
     }
-
-    // Work orders can be read by the service provider they are assigned to,
-    // or by the user who created them.
-    // They can be created by any authenticated user.
-    match /workOrders/{workOrderId} {
-      allow read: if request.auth != null && (request.auth.uid == resource.data.serviceProviderId || request.auth.uid == resource.data.userId);
-      allow create: if request.auth != null;
-      // Allow the service provider to update the status, etc.
-      allow update: if request.auth != null && request.auth.uid == resource.data.serviceProviderId;
+    match /masterComponents/{componentId} {
+      // Allow signed-in users to read all master components.
+      // Allow signed-in users to write (create, update, delete) to master components for admin functionality.
+      allow read, write: if request.auth != null;
     }
-
-    // Make global data like countries, components, etc., readable by all.
-    match /{document=**} {
-        allow read: if true;
+     match /ignoredDuplicates/{key} {
+      allow read, write: if request.auth != null;
     }
+    match /trainingData/{docId} {
+      allow write: if request.auth != null;
+    }
+    // Any authenticated user can create their own document in the 'serviceProviders' collection
+    // and can only read/write their own document after it's created.
+    match /serviceProviders/{userId} {
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
   }
+}
 }
