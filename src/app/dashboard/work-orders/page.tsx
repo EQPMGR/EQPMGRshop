@@ -16,8 +16,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { WorkOrderDetailSheet } from "@/components/work-order-detail-sheet";
 
-type WorkOrder = {
+export type WorkOrder = {
   id: string;
   customerName: string;
   bike: string;
@@ -26,6 +27,11 @@ type WorkOrder = {
   status: "New" | "In Progress" | "Awaiting Parts" | "Completed";
   priority?: "Low" | "Medium" | "High";
   priorityLoading?: boolean;
+  // Add all other fields from firestore
+  userEmail: string;
+  userPhone: string;
+  notes: string;
+  equipmentName: string;
 };
 
 const statusVariant: { [key in WorkOrder['status']]: "default" | "secondary" | "destructive" | "outline" } = {
@@ -45,6 +51,8 @@ export default function WorkOrdersPage() {
   const { user } = useAuth();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -74,6 +82,10 @@ export default function WorkOrdersPage() {
           issueDescription: data.serviceType || 'No description',
           createdAt: data.createdAt?.toDate().toLocaleDateString() || 'N/A',
           status: status,
+          userEmail: data.userEmail || '',
+          userPhone: data.userPhone || '',
+          notes: data.notes || '',
+          equipmentName: data.equipmentName || '',
         });
       });
       setWorkOrders(orders);
@@ -96,6 +108,11 @@ export default function WorkOrdersPage() {
         setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, priority: randomPriority, priorityLoading: false } : wo));
     }, 1500);
   };
+  
+  const handleViewDetails = (order: WorkOrder) => {
+    setSelectedWorkOrder(order);
+    setIsSheetOpen(true);
+  }
 
   return (
     <div className="space-y-6">
@@ -164,7 +181,9 @@ export default function WorkOrdersPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleViewDetails(order)}>
+                            View Details
+                        </DropdownMenuItem>
                         <DropdownMenuItem>Update Status</DropdownMenuItem>
                         <DropdownMenuItem className="text-red-500">Cancel Order</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -176,6 +195,13 @@ export default function WorkOrdersPage() {
           </Table>
         )}
       </div>
+      {selectedWorkOrder && (
+        <WorkOrderDetailSheet
+            isOpen={isSheetOpen}
+            onOpenChange={setIsSheetOpen}
+            workOrder={selectedWorkOrder}
+        />
+      )}
     </div>
   );
 }
