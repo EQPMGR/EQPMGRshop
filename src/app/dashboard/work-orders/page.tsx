@@ -23,7 +23,7 @@ type WorkOrder = {
   bike: string;
   issueDescription: string;
   createdAt: string;
-  status: "New" | "In Progress" | "Awaiting Parts" | "Completed";
+  status: "New" | "In Progress" | "Awaiting Parts" | "Completed" | "Pending";
   priority?: "Low" | "Medium" | "High";
   priorityLoading?: boolean;
 };
@@ -32,7 +32,8 @@ const statusVariant: { [key in WorkOrder['status']]: "default" | "secondary" | "
   "New": "default",
   "In Progress": "secondary",
   "Awaiting Parts": "destructive",
-  "Completed": "outline"
+  "Completed": "outline",
+  "Pending": "default",
 };
 
 const priorityVariant: { [key in NonNullable<WorkOrder['priority']>]: "default" | "secondary" | "destructive" } = {
@@ -61,11 +62,11 @@ export default function WorkOrdersPage() {
         const data = doc.data();
         orders.push({
           id: doc.id,
-          customerName: data.customerName || 'N/A',
-          bike: data.bike || 'N/A',
-          issueDescription: data.issueDescription || 'No description',
+          customerName: data.userName || 'N/A',
+          bike: `${data.equipmentBrand} ${data.equipmentModel}` || 'N/A',
+          issueDescription: data.serviceType || 'No description',
           createdAt: data.createdAt?.toDate().toLocaleDateString() || 'N/A',
-          status: data.status || 'New',
+          status: data.status === 'pending' ? 'New' : data.status || 'New',
         });
       });
       setWorkOrders(orders);
