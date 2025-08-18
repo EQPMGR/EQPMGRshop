@@ -10,7 +10,7 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
-import type { WorkOrder } from '@/app/dashboard/work-orders/page';
+import type { WorkOrder, WorkOrderStatus } from '@/app/dashboard/work-orders/page';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -31,10 +31,16 @@ export function WorkOrderDetailSheet({
     return null;
   }
 
-  const statusVariant: { [key in WorkOrder['status']]: "default" | "secondary" | "destructive" | "outline" } = {
+  const statusVariant: { [key in WorkOrderStatus]: "default" | "secondary" | "destructive" | "outline" } = {
     "New": "default",
-    "In Progress": "secondary",
+    "Customer Contacted": "secondary",
+    "Appointment Booked": "secondary",
+    "Bike in Shop": "secondary",
     "Awaiting Parts": "destructive",
+    "Awaiting Service": "secondary",
+    "In Service": "secondary",
+    "Testing": "secondary",
+    "Bike Ready": "outline",
     "Completed": "outline",
   };
 
@@ -128,3 +134,5 @@ export function WorkOrderDetailSheet({
     </Sheet>
   );
 }
+
+    
