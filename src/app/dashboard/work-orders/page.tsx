@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from "react";
@@ -15,7 +16,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type WorkOrder = {
   id: string;
@@ -23,7 +23,7 @@ type WorkOrder = {
   bike: string;
   issueDescription: string;
   createdAt: string;
-  status: "New" | "In Progress" | "Awaiting Parts" | "Completed" | "Pending";
+  status: "New" | "In Progress" | "Awaiting Parts" | "Completed";
   priority?: "Low" | "Medium" | "High";
   priorityLoading?: boolean;
 };
@@ -33,7 +33,6 @@ const statusVariant: { [key in WorkOrder['status']]: "default" | "secondary" | "
   "In Progress": "secondary",
   "Awaiting Parts": "destructive",
   "Completed": "outline",
-  "Pending": "default",
 };
 
 const priorityVariant: { [key in NonNullable<WorkOrder['priority']>]: "default" | "secondary" | "destructive" } = {
@@ -60,13 +59,21 @@ export default function WorkOrdersPage() {
       const orders: WorkOrder[] = [];
       querySnapshot.forEach((doc: DocumentData) => {
         const data = doc.data();
+        
+        let status: WorkOrder['status'] = 'New';
+        if (data.status === 'In Progress' || data.status === 'Awaiting Parts' || data.status === 'Completed') {
+            status = data.status;
+        } else if (data.status === 'pending') {
+            status = 'New';
+        }
+
         orders.push({
           id: doc.id,
           customerName: data.userName || 'N/A',
-          bike: `${data.equipmentBrand} ${data.equipmentModel}` || 'N/A',
+          bike: data.equipmentBrand && data.equipmentModel ? `${data.equipmentBrand} ${data.equipmentModel}` : 'N/A',
           issueDescription: data.serviceType || 'No description',
           createdAt: data.createdAt?.toDate().toLocaleDateString() || 'N/A',
-          status: data.status === 'pending' ? 'New' : data.status || 'New',
+          status: status,
         });
       });
       setWorkOrders(orders);
