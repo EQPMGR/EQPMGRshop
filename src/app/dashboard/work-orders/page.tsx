@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, DocumentData, doc, updateDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, DocumentData, doc, updateDoc, orderBy } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +57,7 @@ export type WorkOrder = {
   equipmentName: string;
 };
 
-const allStatuses: WorkOrderStatus[] = [
+export const allStatuses: WorkOrderStatus[] = [
   "New",
   "Customer Contacted",
   "Appointment Booked",
@@ -70,7 +70,7 @@ const allStatuses: WorkOrderStatus[] = [
   "Completed",
 ];
 
-const statusVariant: { [key in WorkOrderStatus]: "default" | "secondary" | "destructive" | "outline" } = {
+export const statusVariant: { [key in WorkOrderStatus]: "default" | "secondary" | "destructive" | "outline" } = {
   "New": "default",
   "Customer Contacted": "secondary",
   "Appointment Booked": "secondary",
@@ -107,7 +107,11 @@ export default function WorkOrdersPage() {
     };
 
     setLoading(true);
-    const q = query(collection(db, "workOrders"), where("serviceProviderId", "==", user.uid));
+    const q = query(
+        collection(db, "workOrders"), 
+        where("serviceProviderId", "==", user.uid),
+        orderBy("createdAt", "desc")
+    );
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const orders: WorkOrder[] = [];
@@ -308,5 +312,7 @@ export default function WorkOrdersPage() {
     </div>
   );
 }
+
+    
 
     

@@ -4,14 +4,18 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { doc, getDoc, updateDoc, collection, query, where, onSnapshot, DocumentData, orderBy, limit } from 'firebase/firestore';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, CheckCircle, DollarSign, Users, Loader2 } from "lucide-react";
+import { Wrench, CheckCircle, DollarSign, Users, Loader2, Dot } from "lucide-react";
+import { WorkOrder, WorkOrderStatus, allStatuses, statusVariant } from '@/app/dashboard/work-orders/page';
+import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+
 
 type Availability = "Today" | "2-3 Day Wait" | "One Week Wait" | "Not Taking Orders";
 
@@ -24,6 +28,8 @@ export default function DashboardPage() {
   const [valetService, setValetService] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [recentWorkOrders, setRecentWorkOrders] = useState<WorkOrder[]>([]);
+  const [workOrdersLoading, setWorkOrdersLoading] = useState(true);
 
   const stats = [
     { title: "Open Work Orders", value: "12", icon: Wrench, color: "text-accent" },
@@ -49,6 +55,57 @@ export default function DashboardPage() {
     };
     fetchShopSettings();
   }, [user]);
+
+   useEffect(() => {
+    if (!user) {
+      setWorkOrdersLoading(false);
+      return;
+    };
+
+    setWorkOrdersLoading(true);
+    const q = query(
+        collection(db, "workOrders"), 
+        where("serviceProviderId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(5)
+    );
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const orders: WorkOrder[] = [];
+      querySnapshot.forEach((doc: DocumentData) => {
+        const data = doc.data();
+        
+        let status: WorkOrderStatus = 'New';
+        if (allStatuses.includes(data.status)) {
+            status = data.status;
+        } else if (data.status === 'pending') {
+            status = 'New';
+        }
+
+        orders.push({
+          id: doc.id,
+          customerName: data.userName || 'N/A',
+          bike: data.equipmentBrand && data.equipmentModel ? `${data.equipmentBrand} ${data.equipmentModel}` : 'N/A',
+          issueDescription: data.serviceType || 'No description',
+          createdAt: data.createdAt?.toDate().toLocaleDateString() || 'N/A',
+          status: status,
+          userEmail: data.userEmail || '',
+          userPhone: data.userPhone || '',
+          notes: data.notes || '',
+          equipmentName: data.equipmentName || '',
+        });
+      });
+      setRecentWorkOrders(orders);
+      setWorkOrdersLoading(false);
+    }, (error) => {
+        console.error("Error fetching work orders: ", error);
+        toast({ title: "Error", description: "Could not fetch recent work orders.", variant: "destructive" });
+        setWorkOrdersLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, toast]);
+
 
   const handleSaveChanges = async () => {
     if (!user) {
@@ -150,10 +207,39 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4">
             <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
+                <CardTitle>Recent Work Orders</CardTitle>
+                <CardDescription>A list of your 5 most recent work orders.</CardDescription>
             </CardHeader>
             <CardContent>
-                <p>Activity feed coming soon...</p>
+               {workOrdersLoading ? (
+                 <div className="flex items-center justify-center h-24">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                 </div>
+               ) : recentWorkOrders.length === 0 ? (
+                 <p className="text-sm text-muted-foreground">No recent work orders found.</p>
+               ) : (
+                <div className="space-y-4">
+                  {recentWorkOrders.map((order) => (
+                    <div key={order.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                         <div className="hidden h-9 w-9 items-center justify-center rounded-lg bg-muted sm:flex">
+                           <Wrench className="h-5 w-5 text-muted-foreground" />
+                         </div>
+                         <div className="grid gap-1">
+                           <p className="font-medium">{order.customerName}</p>
+                           <p className="text-sm text-muted-foreground">{order.bike} - {order.issueDescription}</p>
+                         </div>
+                      </div>
+                      <Badge variant={statusVariant[order.status]}>{order.status}</Badge>
+                    </div>
+                  ))}
+                  <div className="pt-2">
+                     <Button asChild size="sm" variant="link" className="px-0">
+                       <Link href="/dashboard/work-orders">View all work orders</Link>
+                    </Button>
+                  </div>
+                </div>
+               )}
             </CardContent>
         </Card>
         <Card className="col-span-3">
@@ -168,5 +254,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
 
     
