@@ -1,50 +1,62 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is an admin for a shop
-    function isShopAdmin(userId) {
-      return exists(/databases/$(database)/documents/users/$(userId)) &&
-             get(/databases/$(database)/documents/users/$(userId)).data.get('roles', {})['admin'] == true;
-    }
-
-    // USER DATA: Users can read/write their own data.
-    match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
-    }
-
-    // EQUIPMENT: Users can manage their own equipment.
-    // Shops can manage equipment if they have an associated work order.
-    match /users/{userId}/equipment/{equipmentId} {
-       allow read, write: if request.auth.uid == userId ||
-         exists(/databases/$(database)/documents/workOrders/$(workOrderId))
-         where get(/databases/$(database)/documents/workOrders/$(workOrderId)).data.serviceProviderId == request.auth.uid
-         && get(/databases/$(database)/documents/workOrders/$(workOrderId)).data.userId == userId;
-    }
     
+    function isShopWithOpenWorkOrder(clientId) {
+      // Allow if a work order exists where the requester is the service provider
+      // and the work order is for the client whose data is being accessed.
+      // We check for status != 'Completed' to ensure access is revoked after the job is done.
+      return exists(/databases/$(database)/documents/workOrders/$(*)) where
+             get(/databases/$(database)/documents/workOrders/$(*)).data.serviceProviderId == request.auth.uid &&
+             get(/databases/$(database)/documents/workOrders/$(*)).data.userId == clientId &&
+             get(/databases/$(database)/documents/workOrders/$(*)).data.status != 'Completed';
+    }
 
-    // SERVICE PROVIDERS: Only authenticated users can read. Only shop owners can write.
-    match /serviceProviders/{shopId} {
+    // Users can only read/write their own data, OR a shop can access it if there's an open work order.
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isShopWithOpenWorkOrder(userId));
+    }
+
+    // Grant read and write access to equipment data only if the user ID matches the userId field in the equipment document.
+    match /equipment/{equipmentId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Authenticated users can read the global data.
+    match /bikeModels/{bikeId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.uid == shopId;
+    }
+    match /serviceProviders/{providerId} {
+        allow read: if request.auth != null;
+    }
+    match /masterComponents/{componentId} {
+      // Allow signed-in users to read all master components.
+      // Allow signed-in users to write (create, update, delete) to master components for admin functionality.
+      allow read, write: if request.auth != null;
+    }
+     match /ignoredDuplicates/{key} {
+      allow read, write: if request.auth != null;
+    }
+    match /trainingData/{docId} {
+      allow write: if request.auth != null;
+    }
+    // Any authenticated user can create their own document in the 'serviceProviders' collection
+    // and can only read/write their own document after it's created.
+    match /serviceProviders/{userId} {
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // WORK ORDERS: Only authenticated users can create. Only the user who created it
-    // or the service provider assigned to it can read/update it.
     match /workOrders/{workOrderId} {
-      allow read, update: if request.auth.uid == resource.data.userId || request.auth.uid == resource.data.serviceProviderId;
-      allow create: if request.auth.uid == request.resource.data.userId;
+      allow read, write: if request.auth != null && (request.auth.uid == resource.data.serviceProviderId || request.auth.uid == resource.data.userId);
     }
 
-    // EMPLOYEES: Only the shop owner can create/delete employees.
-    // The shop owner and other employees of the same shop can read the employee list.
     match /employees/{employeeId} {
-      allow read, list: if request.auth.uid == resource.data.shopId ||
-        get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.shopId == resource.data.shopId;
-      
-      allow create, delete, update: if request.auth.uid == request.resource.data.shopId;
+      // Allow read/list if the user's UID matches the shopId in the query.
+      allow read, delete, update: if request.auth != null && request.auth.uid == resource.data.shopId;
+      // Allow create if the user's UID matches the shopId in the new document.
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.shopId;
     }
   }
 }
