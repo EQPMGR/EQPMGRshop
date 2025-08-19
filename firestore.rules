@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -10,11 +11,6 @@ service cloud.firestore {
     // Grant read and write access to equipment data only if the user ID matches the userId field in the equipment document.
     match /equipment/{equipmentId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-    }
-    
-    // Allow users to read work orders they created, and service providers to read work orders assigned to them.
-    match /workOrders/{orderId} {
-        allow read: if request.auth != null && (request.auth.uid == resource.data.userId || request.auth.uid == resource.data.serviceProviderId);
     }
 
     // Authenticated users can read the global data.
@@ -41,10 +37,16 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId;
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Shop owners can manage employees associated with their shop.
+
+    match /workOrders/{workOrderId} {
+      allow read, write: if request.auth != null && (request.auth.uid == resource.data.serviceProviderId || request.auth.uid == resource.data.userId);
+    }
+
     match /employees/{employeeId} {
-        allow read, write, delete: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/employees/$(employeeId)).data.shopId;
+      // Allow read/list if the user's UID matches the shopId in the query.
+      allow read, delete, update: if request.auth != null && request.auth.uid == resource.data.shopId;
+      // Allow create if the user's UID matches the shopId in the new document.
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.shopId;
     }
   }
 }
