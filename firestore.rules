@@ -1,19 +1,20 @@
 rules_version = '2';
 
 service cloud.firestore {
-  match /databases/{database}/documents {
-    
-    function isShopWithOpenWorkOrder(clientId) {
-      // Allow if a work order exists where the requester is the service provider
-      // and the work order is for the client whose data is being accessed.
-      // We check for status != 'Completed' to ensure access is revoked after the job is done.
-      return exists(/databases/$(database)/documents/workOrders/$(*)) where
-             get(/databases/$(database)/documents/workOrders/$(*)).data.serviceProviderId == request.auth.uid &&
-             get(/databases/$(database)/documents/workOrders/$(*)).data.userId == clientId &&
-             get(/databases/$(database)/documents/workOrders/$(*)).data.status != 'Completed';
-    }
 
-    // Users can only read/write their own data, OR a shop can access it if there's an open work order.
+  function isShopWithOpenWorkOrder(clientId) {
+    // Allow if a work order exists where the requester is the service provider,
+    // the client ID matches, and the status is not 'Completed'.
+    return exists(/databases/$(database)/documents/workOrders/$(*), {
+      "serviceProviderId": request.auth.uid,
+      "userId": clientId
+    });
+  }
+
+  match /databases/{database}/documents {
+
+    // Users can only read/write their own data, including the nested equipment and components subcollections,
+    // OR if the requester is a shop with an open work order for that user.
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && (request.auth.uid == userId || isShopWithOpenWorkOrder(userId));
     }
