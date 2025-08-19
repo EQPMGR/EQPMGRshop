@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Wrench, CheckCircle, DollarSign, Users, Loader2, Dot } from "lucide-react";
 import { WorkOrder, WorkOrderStatus, allStatuses, statusVariant } from '@/app/dashboard/work-orders/page';
+import { Employee } from '@/app/dashboard/employees/page';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 
@@ -28,14 +29,18 @@ export default function DashboardPage() {
   const [valetService, setValetService] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
   const [recentWorkOrders, setRecentWorkOrders] = useState<WorkOrder[]>([]);
   const [workOrdersLoading, setWorkOrdersLoading] = useState(true);
 
+  const [openWorkOrdersCount, setOpenWorkOrdersCount] = useState(0);
+  const [teamMembersCount, setTeamMembersCount] = useState(0);
+
   const stats = [
-    { title: "Open Work Orders", value: "12", icon: Wrench, color: "text-accent" },
+    { title: "Open Work Orders", value: openWorkOrdersCount.toString(), icon: Wrench, color: "text-accent" },
     { title: "Completed This Month", value: "47", icon: CheckCircle, color: "text-green-500" },
     { title: "Revenue (MTD)", value: "$8,230", icon: DollarSign, color: "text-blue-500" },
-    { title: "Team Members", value: "4", icon: Users, color: "text-purple-500" },
+    { title: "Team Members", value: teamMembersCount.toString(), icon: Users, color: "text-purple-500" },
   ];
 
   useEffect(() => {
@@ -63,16 +68,27 @@ export default function DashboardPage() {
     };
 
     setWorkOrdersLoading(true);
-    // The query was causing an error because it required a composite index.
-    // We are now fetching without ordering and will sort the results on the client.
-    const q = query(
+    // This query fetches all work orders to calculate stats.
+    const allWorkOrdersQuery = query(
+        collection(db, "workOrders"), 
+        where("serviceProviderId", "==", user.uid)
+    );
+
+    const unsubscribeAll = onSnapshot(allWorkOrdersQuery, (querySnapshot) => {
+        const openOrders = querySnapshot.docs.filter(doc => doc.data().status !== 'Completed').length;
+        setOpenWorkOrdersCount(openOrders);
+    });
+
+
+    // This query fetches the 5 most recent for the list display.
+    const recentWorkOrdersQuery = query(
         collection(db, "workOrders"), 
         where("serviceProviderId", "==", user.uid),
-        // orderBy("createdAt", "desc"), // This was causing the error
+        orderBy("createdAt", "desc"),
         limit(5)
     );
     
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribeRecent = onSnapshot(recentWorkOrdersQuery, (querySnapshot) => {
       const orders: WorkOrder[] = [];
       querySnapshot.forEach((doc: DocumentData) => {
         const data = doc.data();
@@ -97,9 +113,7 @@ export default function DashboardPage() {
           equipmentName: data.equipmentName || '',
         });
       });
-      // Sort the orders by date on the client side
-      const sortedOrders = orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setRecentWorkOrders(sortedOrders);
+      setRecentWorkOrders(orders);
       setWorkOrdersLoading(false);
     }, (error) => {
         console.error("Error fetching work orders: ", error);
@@ -107,7 +121,18 @@ export default function DashboardPage() {
         setWorkOrdersLoading(false);
     });
 
-    return () => unsubscribe();
+    // Fetch employees for team member count
+     const employeesQuery = query(collection(db, 'employees'), where('shopId', '==', user.uid));
+     const unsubscribeEmployees = onSnapshot(employeesQuery, (snapshot) => {
+        setTeamMembersCount(snapshot.size);
+     });
+
+
+    return () => {
+        unsubscribeAll();
+        unsubscribeRecent();
+        unsubscribeEmployees();
+    };
   }, [user, toast]);
 
 
@@ -203,7 +228,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">+2 from last month</p>
+              {/* <p className="text-xs text-muted-foreground">+2 from last month</p> */}
             </CardContent>
           </Card>
         ))}
@@ -258,3 +283,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
