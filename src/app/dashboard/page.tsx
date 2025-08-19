@@ -44,8 +44,9 @@ export default function DashboardPage() {
   ];
 
   useEffect(() => {
+    if (!user) return;
+
     const fetchShopSettings = async () => {
-      if (user) {
         setLoading(true);
         const serviceProviderRef = doc(db, "serviceProviders", user.uid);
         const docSnap = await getDoc(serviceProviderRef);
@@ -56,18 +57,15 @@ export default function DashboardPage() {
           setValetService(data.valetService || false);
         }
         setLoading(false);
-      }
     };
     fetchShopSettings();
   }, [user]);
 
    useEffect(() => {
-    if (!user) {
-      setWorkOrdersLoading(false);
-      return;
-    };
+    if (!user) return;
 
     setWorkOrdersLoading(true);
+    
     // This query fetches all work orders to calculate stats.
     const allWorkOrdersQuery = query(
         collection(db, "workOrders"), 
@@ -283,4 +281,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
