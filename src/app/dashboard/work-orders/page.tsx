@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, DocumentData, doc, updateDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, DocumentData, doc, updateDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -110,8 +110,7 @@ export default function WorkOrdersPage() {
     setLoading(true);
     const q = query(
         collection(db, "workOrders"), 
-        where("serviceProviderId", "==", user.uid),
-        orderBy("createdAt", "desc")
+        where("serviceProviderId", "==", user.uid)
     );
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -141,15 +140,22 @@ export default function WorkOrdersPage() {
           equipmentId: data.equipmentId || '',
         });
       });
-      setWorkOrders(orders.sort((a,b) => (a.status === 'Completed' ? 1 : -1) - (b.status === 'Completed' ? 1: -1) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+       // Sort client-side to avoid index requirement & complex sorting
+      const sortedOrders = orders.sort((a, b) => {
+        if (a.status === 'Completed' && b.status !== 'Completed') return 1;
+        if (a.status !== 'Completed' && b.status === 'Completed') return -1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      setWorkOrders(sortedOrders);
       setLoading(false);
     }, (error) => {
         console.error("Error fetching work orders: ", error);
+        toast({ title: "Error", description: "Could not fetch work orders.", variant: "destructive" });
         setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, toast]);
 
   const handleGetPriority = (id: string) => {
     setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, priorityLoading: true } : wo));

@@ -4,44 +4,47 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can read and update their own user document
+    // Helper function to check if a user is an admin for a shop
+    function isShopAdmin(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) &&
+             get(/databases/$(database)/documents/users/$(userId)).data.get('roles', {})['admin'] == true;
+    }
+
+    // USER DATA: Users can read/write their own data.
     match /users/{userId} {
-      allow read, update, delete: if request.auth.uid == userId;
-      allow create: if request.auth.uid != null;
-
-      // Existing rule: A user can manage their own equipment.
-      // New rule: A shop can also access equipment if there's a valid work order.
-      match /equipment/{equipmentId} {
-        allow read, write: if request.auth.uid == userId || 
-                            exists(/databases/$(database)/documents/workOrders/{workOrderId}) &&
-                            get(/databases/$(database)/documents/workOrders/{workOrderId}).data.serviceProviderId == request.auth.uid &&
-                            get(/databases/$(database)/documents/workOrders/{workOrderId}).data.userId == userId &&
-                            get(/databases/$(database)/documents/workOrders/{workOrderId}).data.equipmentId == equipmentId &&
-                            get(/databases/$(database)/documents/workOrders/{workOrderId}).data.status != 'Completed';
-      }
+      allow read, write: if request.auth.uid == userId;
     }
 
-    // Service providers (shops) can be created by any authenticated user, but only the owner can modify it.
-    match /serviceProviders/{shopId} {
-      allow read: if true; // Publicly readable
-      allow create: if request.auth.uid != null;
-      allow update, delete: if request.auth.uid == resource.data.ownerId;
-    }
-
-    // Work Orders can be read by either the client or the service provider.
-    // They can only be created by an authenticated user (the client).
-    // They can only be updated by the service provider (the shop).
-    match /workOrders/{workOrderId} {
-      allow read: if request.auth.uid == resource.data.userId || request.auth.uid == resource.data.serviceProviderId;
-      allow create: if request.auth.uid != null;
-      allow update: if request.auth.uid == resource.data.serviceProviderId;
+    // EQUIPMENT: Users can manage their own equipment.
+    // Shops can manage equipment if they have an associated work order.
+    match /users/{userId}/equipment/{equipmentId} {
+       allow read, write: if request.auth.uid == userId ||
+         exists(/databases/$(database)/documents/workOrders/$(workOrderId))
+         where get(/databases/$(database)/documents/workOrders/$(workOrderId)).data.serviceProviderId == request.auth.uid
+         && get(/databases/$(database)/documents/workOrders/$(workOrderId)).data.userId == userId;
     }
     
-    // Employees can be managed by the shop owner.
+
+    // SERVICE PROVIDERS: Only authenticated users can read. Only shop owners can write.
+    match /serviceProviders/{shopId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == shopId;
+    }
+
+    // WORK ORDERS: Only authenticated users can create. Only the user who created it
+    // or the service provider assigned to it can read/update it.
+    match /workOrders/{workOrderId} {
+      allow read, update: if request.auth.uid == resource.data.userId || request.auth.uid == resource.data.serviceProviderId;
+      allow create: if request.auth.uid == request.resource.data.userId;
+    }
+
+    // EMPLOYEES: Only the shop owner can create/delete employees.
+    // The shop owner and other employees of the same shop can read the employee list.
     match /employees/{employeeId} {
-        allow read, write, create, delete: if request.auth.uid == resource.data.shopId;
-        // Allow the shop owner to list their employees
-        allow list: if request.auth.uid == request.query.shopId;
+      allow read, list: if request.auth.uid == resource.data.shopId ||
+        get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.shopId == resource.data.shopId;
+      
+      allow create, delete, update: if request.auth.uid == request.resource.data.shopId;
     }
   }
 }
