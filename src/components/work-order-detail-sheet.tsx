@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -9,12 +10,17 @@ import {
   SheetDescription,
   SheetFooter,
 } from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
 import type { WorkOrder, WorkOrderStatus } from '@/app/dashboard/work-orders/page';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
+import { BikeFitDialog } from './bike-fit-dialog';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Equipment } from '@/lib/types';
+import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface WorkOrderDetailSheetProps {
   isOpen: boolean;
@@ -27,6 +33,47 @@ export function WorkOrderDetailSheet({
   onOpenChange,
   workOrder,
 }: WorkOrderDetailSheetProps) {
+  const [equipment, setEquipment] = useState<Equipment | null>(null);
+  const [loadingEquipment, setLoadingEquipment] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchEquipment = async () => {
+      if (isOpen && workOrder?.userId && workOrder?.equipmentId) {
+        setLoadingEquipment(true);
+        try {
+          const equipmentDocRef = doc(db, 'users', workOrder.userId, 'equipment', workOrder.equipmentId);
+          const docSnap = await getDoc(equipmentDocRef);
+          if (docSnap.exists()) {
+            setEquipment({ id: docSnap.id, ...docSnap.data() } as Equipment);
+          } else {
+            toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: 'Could not find the equipment associated with this work order.',
+            });
+            setEquipment(null);
+          }
+        } catch (error) {
+          console.error("Error fetching equipment:", error);
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Failed to fetch equipment data.',
+          });
+          setEquipment(null);
+        } finally {
+          setLoadingEquipment(false);
+        }
+      } else {
+        setEquipment(null);
+      }
+    };
+
+    fetchEquipment();
+  }, [isOpen, workOrder, toast]);
+
+
   if (!workOrder) {
     return null;
   }
@@ -43,6 +90,18 @@ export function WorkOrderDetailSheet({
     "Bike Ready": "outline",
     "Completed": "outline",
   };
+
+  const handleFitDataSuccess = () => {
+    // Re-fetch equipment data to get the latest fit data
+     if (workOrder?.userId && workOrder?.equipmentId) {
+        const equipmentDocRef = doc(db, 'users', workOrder.userId, 'equipment', workOrder.equipmentId);
+        getDoc(equipmentDocRef).then(docSnap => {
+            if (docSnap.exists()) {
+                setEquipment({ id: docSnap.id, ...docSnap.data() } as Equipment);
+            }
+        });
+     }
+  }
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -84,6 +143,24 @@ export function WorkOrderDetailSheet({
                  <div className="flex justify-between">
                     <span className="text-muted-foreground">Nickname</span>
                     <span className="font-medium text-foreground">{workOrder.equipmentName}</span>
+                </div>
+                <div className="pt-2">
+                    {loadingEquipment ? (
+                        <Button disabled className="w-full">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Loading Fit Data...
+                        </Button>
+                    ) : equipment ? (
+                        <BikeFitDialog 
+                            equipment={equipment} 
+                            userId={workOrder.userId}
+                            onSuccess={handleFitDataSuccess}
+                        >
+                            <Button className="w-full bg-accent hover:bg-accent/90">Edit Bike Fit</Button>
+                        </BikeFitDialog>
+                    ) : (
+                         <Button disabled variant="outline" className="w-full">No Equipment Found</Button>
+                    )}
                 </div>
              </div>
           </div>
@@ -134,5 +211,3 @@ export function WorkOrderDetailSheet({
     </Sheet>
   );
 }
-
-    

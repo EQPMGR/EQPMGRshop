@@ -23,7 +23,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -55,6 +54,8 @@ export type WorkOrder = {
   userPhone: string;
   notes: string;
   equipmentName: string;
+  userId: string;
+  equipmentId: string;
 };
 
 export const allStatuses: WorkOrderStatus[] = [
@@ -136,6 +137,8 @@ export default function WorkOrdersPage() {
           userPhone: data.userPhone || '',
           notes: data.notes || '',
           equipmentName: data.equipmentName || '',
+          userId: data.userId || '',
+          equipmentId: data.equipmentId || '',
         });
       });
       setWorkOrders(orders.sort((a,b) => (a.status === 'Completed' ? 1 : -1) - (b.status === 'Completed' ? 1: -1) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
@@ -312,7 +315,3 @@ export default function WorkOrdersPage() {
     </div>
   );
 }
-
-    
-
-    
