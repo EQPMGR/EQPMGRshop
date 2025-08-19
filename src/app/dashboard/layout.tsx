@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Wrench, Users, Settings, Home, LogOut } from 'lucide-react';
+import { Wrench, Users, Settings, Home, LogOut, Ruler } from 'lucide-react';
 import { AuthGuard } from '@/components/auth-guard';
 import { UserNav } from '@/components/user-nav';
 import { useAuth } from '@/hooks/use-auth';
@@ -23,6 +23,7 @@ const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   { href: '/dashboard/work-orders', icon: Wrench, label: 'Work Orders' },
   { href: '/dashboard/employees', icon: Users, label: 'Employees' },
+  { href: '/dashboard/bike-fit', icon: Ruler, label: 'Bike Fit' },
   { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];
 
