@@ -4,40 +4,44 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can only read/write their own user document.
+    // Users can read and update their own user document
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
+      allow read, update, delete: if request.auth.uid == userId;
+      allow create: if request.auth.uid != null;
 
-      // Equipment can be managed by the owner, OR by a service provider
-      // with an active work order for that specific piece of equipment.
+      // Existing rule: A user can manage their own equipment.
+      // New rule: A shop can also access equipment if there's a valid work order.
       match /equipment/{equipmentId} {
-        allow read, write: if request.auth.uid == userId ||
-                           exists(/databases/$(database)/documents/workOrders/{workOrderId}) &&
-                           get(/databases/$(database)/documents/workOrders/{workOrderId}).data.serviceProviderId == request.auth.uid &&
-                           get(/databases/$(database)/documents/workOrders/{workOrderId}).data.userId == userId &&
-                           get(/databases/$(database)/documents/workOrders/{workOrderId}).data.equipmentId == equipmentId &&
-                           get(/databases/$(database)/documents/workOrders/{workOrderId}).data.status != "Completed";
+        allow read, write: if request.auth.uid == userId || 
+                            exists(/databases/$(database)/documents/workOrders/{workOrderId}) &&
+                            get(/databases/$(database)/documents/workOrders/{workOrderId}).data.serviceProviderId == request.auth.uid &&
+                            get(/databases/$(database)/documents/workOrders/{workOrderId}).data.userId == userId &&
+                            get(/databases/$(database)/documents/workOrders/{workOrderId}).data.equipmentId == equipmentId &&
+                            get(/databases/$(database)/documents/workOrders/{workOrderId}).data.status != 'Completed';
       }
     }
 
-    // Service providers can manage their own document.
-    match /serviceProviders/{serviceProviderId} {
-      allow read, write: if request.auth.uid == serviceProviderId;
+    // Service providers (shops) can be created by any authenticated user, but only the owner can modify it.
+    match /serviceProviders/{shopId} {
+      allow read: if true; // Publicly readable
+      allow create: if request.auth.uid != null;
+      allow update, delete: if request.auth.uid == resource.data.ownerId;
     }
 
-    // Work orders can be read by the client (user) or the service provider.
-    // They can only be created by the user, and updated by the service provider.
+    // Work Orders can be read by either the client or the service provider.
+    // They can only be created by an authenticated user (the client).
+    // They can only be updated by the service provider (the shop).
     match /workOrders/{workOrderId} {
       allow read: if request.auth.uid == resource.data.userId || request.auth.uid == resource.data.serviceProviderId;
-      allow create: if request.auth.uid == request.resource.data.userId;
+      allow create: if request.auth.uid != null;
       allow update: if request.auth.uid == resource.data.serviceProviderId;
     }
     
     // Employees can be managed by the shop owner.
     match /employees/{employeeId} {
-       allow read, create, delete: if request.auth.uid == request.resource.data.shopId;
-       // Allow list by shop owners
-       allow list: if request.auth.uid == request.query.shopId;
+        allow read, write, create, delete: if request.auth.uid == resource.data.shopId;
+        // Allow the shop owner to list their employees
+        allow list: if request.auth.uid == request.query.shopId;
     }
   }
 }
