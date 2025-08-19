@@ -75,6 +75,9 @@ export default function DashboardPage() {
     const unsubscribeAll = onSnapshot(allWorkOrdersQuery, (querySnapshot) => {
         const openOrders = querySnapshot.docs.filter(doc => doc.data().status !== 'Completed').length;
         setOpenWorkOrdersCount(openOrders);
+    }, (error) => {
+        console.error("Error fetching all work orders for stats: ", error);
+        // Optionally show a toast or error message
     });
 
 
@@ -82,7 +85,7 @@ export default function DashboardPage() {
     const recentWorkOrdersQuery = query(
         collection(db, "workOrders"), 
         where("serviceProviderId", "==", user.uid),
-        orderBy("createdAt", "desc"),
+        // orderBy("createdAt", "desc"), // This causes an index error. We will sort on the client.
         limit(5)
     );
     
@@ -111,10 +114,12 @@ export default function DashboardPage() {
           equipmentName: data.equipmentName || '',
         });
       });
-      setRecentWorkOrders(orders);
+      // Sort client-side to avoid index requirement
+      const sortedOrders = orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setRecentWorkOrders(sortedOrders);
       setWorkOrdersLoading(false);
     }, (error) => {
-        console.error("Error fetching work orders: ", error);
+        console.error("Error fetching recent work orders: ", error);
         toast({ title: "Error", description: "Could not fetch recent work orders.", variant: "destructive" });
         setWorkOrdersLoading(false);
     });
@@ -123,6 +128,9 @@ export default function DashboardPage() {
      const employeesQuery = query(collection(db, 'employees'), where('shopId', '==', user.uid));
      const unsubscribeEmployees = onSnapshot(employeesQuery, (snapshot) => {
         setTeamMembersCount(snapshot.size);
+     }, (error) => {
+        console.error("Error fetching employees: ", error);
+        // Optionally show a toast or error message
      });
 
 
