@@ -63,10 +63,12 @@ export default function DashboardPage() {
     };
 
     setWorkOrdersLoading(true);
+    // The query was causing an error because it required a composite index.
+    // We are now fetching without ordering and will sort the results on the client.
     const q = query(
         collection(db, "workOrders"), 
         where("serviceProviderId", "==", user.uid),
-        orderBy("createdAt", "desc"),
+        // orderBy("createdAt", "desc"), // This was causing the error
         limit(5)
     );
     
@@ -95,7 +97,9 @@ export default function DashboardPage() {
           equipmentName: data.equipmentName || '',
         });
       });
-      setRecentWorkOrders(orders);
+      // Sort the orders by date on the client side
+      const sortedOrders = orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setRecentWorkOrders(sortedOrders);
       setWorkOrdersLoading(false);
     }, (error) => {
         console.error("Error fetching work orders: ", error);
