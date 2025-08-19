@@ -3,50 +3,41 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read/write their own data, including the nested equipment and components subcollections.
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    // Users can only read/write their own user document.
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+
+      // Equipment can be managed by the owner, OR by a service provider
+      // with an active work order for that specific piece of equipment.
+      match /equipment/{equipmentId} {
+        allow read, write: if request.auth.uid == userId ||
+                           exists(/databases/$(database)/documents/workOrders/{workOrderId}) &&
+                           get(/databases/$(database)/documents/workOrders/{workOrderId}).data.serviceProviderId == request.auth.uid &&
+                           get(/databases/$(database)/documents/workOrders/{workOrderId}).data.userId == userId &&
+                           get(/databases/$(database)/documents/workOrders/{workOrderId}).data.equipmentId == equipmentId &&
+                           get(/databases/$(database)/documents/workOrders/{workOrderId}).data.status != "Completed";
+      }
     }
 
-    // Grant read and write access to equipment data only if the user ID matches the userId field in the equipment document.
-    match /equipment/{equipmentId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    // Service providers can manage their own document.
+    match /serviceProviders/{serviceProviderId} {
+      allow read, write: if request.auth.uid == serviceProviderId;
     }
 
-    // Authenticated users can read the global data.
-    match /bikeModels/{bikeId} {
-      allow read: if request.auth != null;
-    }
-    match /serviceProviders/{providerId} {
-        allow read: if request.auth != null;
-    }
-    match /masterComponents/{componentId} {
-      // Allow signed-in users to read all master components.
-      // Allow signed-in users to write (create, update, delete) to master components for admin functionality.
-      allow read, write: if request.auth != null;
-    }
-     match /ignoredDuplicates/{key} {
-      allow read, write: if request.auth != null;
-    }
-    match /trainingData/{docId} {
-      allow write: if request.auth != null;
-    }
-    // Any authenticated user can create their own document in the 'serviceProviders' collection
-    // and can only read/write their own document after it's created.
-    match /serviceProviders/{userId} {
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-
+    // Work orders can be read by the client (user) or the service provider.
+    // They can only be created by the user, and updated by the service provider.
     match /workOrders/{workOrderId} {
-      allow read, write: if request.auth != null && (request.auth.uid == resource.data.serviceProviderId || request.auth.uid == resource.data.userId);
+      allow read: if request.auth.uid == resource.data.userId || request.auth.uid == resource.data.serviceProviderId;
+      allow create: if request.auth.uid == request.resource.data.userId;
+      allow update: if request.auth.uid == resource.data.serviceProviderId;
     }
-
+    
+    // Employees can be managed by the shop owner.
     match /employees/{employeeId} {
-      // Allow read/list if the user's UID matches the shopId in the query.
-      allow read, delete, update: if request.auth != null && request.auth.uid == resource.data.shopId;
-      // Allow create if the user's UID matches the shopId in the new document.
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.shopId;
+       allow read, create, delete: if request.auth.uid == request.resource.data.shopId;
+       // Allow list by shop owners
+       allow list: if request.auth.uid == request.query.shopId;
     }
   }
 }
