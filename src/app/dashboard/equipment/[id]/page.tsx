@@ -41,8 +41,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ComponentStatusList } from '@/components/component-status-list';
 import { MaintenanceLog } from '@/components/maintenance-log';
-import { WearSimulation } from '@/components/wear-simulation';
-import { MaintenanceSchedule } from '@/components/maintenance-schedule';
 import type { Equipment, MaintenanceLog as MaintenanceLogType, Component, MasterComponent, UserComponent } from '@/lib/types';
 import { AccessoriesIcon } from '@/components/icons/accessories-icon';
 import { WheelsetIcon } from '@/components/icons/wheelset-icon';
@@ -448,8 +446,6 @@ export default function EquipmentDetailPage() {
             </Card>
             
             <MaintenanceLog log={equipment.maintenanceLog} onAddLog={handleAddLog} />
-            <WearSimulation equipment={equipment} onSuccess={() => fetchEquipment(clientId!)} />
-            <MaintenanceSchedule equipment={equipment} />
           </div>
           <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-1">
              {associatedShoes.length > 0 && (
@@ -469,51 +465,6 @@ export default function EquipmentDetailPage() {
                     </CardContent>
                 </Card>
             )}
-            <Card>
-              <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                      <Wrench />
-                      Service & Support
-                  </CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-2">
-                <Button>Request Service</Button>
-              </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FitInfoIcon className="h-5 w-5" />
-                        Bike Fit
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-2">
-                   <BikeFitDialog equipment={equipment} userId={clientId!} onSuccess={() => fetchEquipment(clientId!)}>
-                        <Button>Enter Fit Details</Button>
-                   </BikeFitDialog>
-                   <Button variant="secondary">Book a Bike Fitting</Button>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Shield />
-                        Protect Your Gear
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-2">
-                    <Button asChild>
-                        <Link href="https://project529.com/garage" target="_blank" rel="noopener noreferrer">
-                            Register with Project 529
-                        </Link>
-                    </Button>
-                    <Button asChild variant="secondary">
-                        <Link href="#" target="_blank" rel="noopener noreferrer">
-                            Get Insurance Quote
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
           </div>
         </div>
     </div>
