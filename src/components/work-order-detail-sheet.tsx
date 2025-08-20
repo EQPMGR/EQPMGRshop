@@ -1,7 +1,9 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Sheet,
   SheetContent,
@@ -37,9 +39,8 @@ export function WorkOrderDetailSheet({
   const [loadingEquipment, setLoadingEquipment] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchEquipment = async () => {
-      if (isOpen && workOrder?.userId && workOrder?.equipmentId) {
+  const fetchEquipmentData = async () => {
+    if (isOpen && workOrder?.userId && workOrder?.equipmentId) {
         setLoadingEquipment(true);
         try {
           const equipmentDocRef = doc(db, 'users', workOrder.userId, 'equipment', workOrder.equipmentId);
@@ -59,7 +60,7 @@ export function WorkOrderDetailSheet({
           toast({
             variant: 'destructive',
             title: 'Error',
-            description: 'Failed to fetch equipment data.',
+            description: 'Failed to fetch equipment data. Check security rules.',
           });
           setEquipment(null);
         } finally {
@@ -68,9 +69,11 @@ export function WorkOrderDetailSheet({
       } else {
         setEquipment(null);
       }
-    };
+  }
 
-    fetchEquipment();
+  useEffect(() => {
+    fetchEquipmentData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, workOrder, toast]);
 
 
@@ -92,15 +95,7 @@ export function WorkOrderDetailSheet({
   };
 
   const handleFitDataSuccess = () => {
-    // Re-fetch equipment data to get the latest fit data
-     if (workOrder?.userId && workOrder?.equipmentId) {
-        const equipmentDocRef = doc(db, 'users', workOrder.userId, 'equipment', workOrder.equipmentId);
-        getDoc(equipmentDocRef).then(docSnap => {
-            if (docSnap.exists()) {
-                setEquipment({ id: docSnap.id, ...docSnap.data() } as Equipment);
-            }
-        });
-     }
+     fetchEquipmentData();
   }
 
   return (
@@ -144,20 +139,27 @@ export function WorkOrderDetailSheet({
                     <span className="text-muted-foreground">Nickname</span>
                     <span className="font-medium text-foreground">{workOrder.equipmentName}</span>
                 </div>
-                <div className="pt-2">
+                <div className="pt-2 flex flex-col gap-2">
                     {loadingEquipment ? (
                         <Button disabled className="w-full">
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Loading Fit Data...
                         </Button>
                     ) : equipment ? (
-                        <BikeFitDialog 
+                       <>
+                         <BikeFitDialog 
                             equipment={equipment} 
                             userId={workOrder.userId}
                             onSuccess={handleFitDataSuccess}
                         >
                             <Button className="w-full bg-accent hover:bg-accent/90">Edit Bike Fit</Button>
-                        </BikeFitDialog>
+                         </BikeFitDialog>
+                         <Button variant="secondary" asChild>
+                            <Link href={`/dashboard/equipment/${equipment.id}?userId=${workOrder.userId}`}>
+                                View Full Equipment Record
+                            </Link>
+                         </Button>
+                       </>
                     ) : (
                          <Button disabled variant="outline" className="w-full">No Equipment Found</Button>
                     )}
