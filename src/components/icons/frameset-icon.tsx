@@ -1,8 +1,14 @@
+import * as React from 'react';
 
-import * as React from "react";
-export const FramesetIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l7.5-7.5 7.5 7.5" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 6v12h15V6" />
+export function FramesetIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        viewBox="0 0 47.98 29.63"
+        fill="currentColor"
+        {...props}
+    >
+        <path fillRule="evenodd" d="M17,0l-.09,0L14.7.62a.54.54,0,0,0-.38.66l.83,3.11L.48,19.09h0a1.63,1.63,0,0,0-.43,1.57A1.61,1.61,0,0,0,1.2,21.82h0l19,5.1a2.69,2.69,0,0,0,2,2.62,2.73,2.73,0,0,0,3.34-1.93,2.7,2.7,0,0,0-.16-1.84L44.61,10.55l.1.39a.54.54,0,0,0,.66.38l2.21-.59a.54.54,0,0,0,.38-.66L45.84,2.14a.54.54,0,0,0-.66-.38L43,2.35a.54.54,0,0,0-.38.66l.09.32-24.34,0L17.56.39A.54.54,0,0,0,17,0ZM42.82,6.88,23.56,22.78,19.31,6.93l23.51,0ZM16.12,8l4.16,15.53L4.77,19.41,16.12,8Zm6.76,18a.8.8,0,0,1,.26,0,.85.85,0,0,1,.61,1.06.86.86,0,1,1-1.67-.44.89.89,0,0,1,.8-.65Z"/>
     </svg>
-);
+  );
+}
