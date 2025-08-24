@@ -50,14 +50,16 @@ export default function SystemDetailPage() {
          setEquipment(null);
       }
 
-      // Fetch components from the subcollection
+      // 1. Fetch user's components from the subcollection
       const componentsQuery = query(collection(db, 'users', uid, 'equipment', equipmentId, 'components'));
       const componentsSnapshot = await getDocs(componentsQuery);
       const userComponents: UserComponent[] = componentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserComponent));
 
+      // 2. Get all unique masterComponentIds
       const masterComponentIds = [...new Set(userComponents.map(c => c.masterComponentId).filter(Boolean))];
       const masterComponentsMap = new Map<string, MasterComponent>();
 
+      // 3. Fetch all master components in batches of 30
       if (masterComponentIds.length > 0) {
            for (let i = 0; i < masterComponentIds.length; i += 30) {
               const batchIds = masterComponentIds.slice(i, i + 30);
@@ -71,17 +73,19 @@ export default function SystemDetailPage() {
           }
       }
 
+      // 4. Join the user component data with the master component data
       const combinedComponents: Component[] = userComponents.map(userComp => {
           const masterComp = masterComponentsMap.get(userComp.masterComponentId);
-          if (!masterComp) return null;
+          // If a master component isn't found, we can't process this user component.
+          if (!masterComp) return null; 
           return {
-              ...masterComp,
-              ...userComp,
-              id: userComp.id, // Ensure the user component ID is used for links
+              ...masterComp, // Spread master data (name, componentGroup, etc.)
+              ...userComp,   // Spread user-specific data (wear, dates, etc.)
+              id: userComp.id, // Ensure userComponent's ID is used for navigation
               purchaseDate: toDate(userComp.purchaseDate),
               lastServiceDate: toNullableDate(userComp.lastServiceDate),
           };
-      }).filter((c): c is Component => c !== null);
+      }).filter((c): c is Component => c !== null); // Filter out any nulls from missing master components
       
       setComponents(combinedComponents);
 
@@ -113,13 +117,16 @@ export default function SystemDetailPage() {
     const systemSlug = params.system.replace(/-/g, ' ').toLowerCase();
 
     return components.filter(c => {
+        // Ensure componentGroup exists and is a string before calling .toLowerCase()
         const componentGroup = c.componentGroup ? c.componentGroup.toLowerCase() : '';
-        const isMatch = componentGroup === systemSlug;
-
-        // Special case for brakes which can be 'disc brake' or 'rim brake'
-        const isBrakeMatch = systemSlug === 'brakes' && componentGroup.includes('brake');
         
-        return isMatch || isBrakeMatch;
+        // Handle the special case where the system is "Brakes"
+        if (systemSlug === 'brakes') {
+            return componentGroup.includes('brake');
+        }
+        
+        // Default comparison for all other systems
+        return componentGroup === systemSlug;
     });
 }, [components, params.system]);
 
@@ -194,3 +201,4 @@ export default function SystemDetailPage() {
     </div>
   );
 }
+
