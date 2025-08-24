@@ -2,34 +2,28 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Checks if a user has an open work order with a specific service provider.
-    function hasOpenWorkOrder(userId, shopId) {
-      return exists(
-        /databases/$(database)/documents/workOrders/
-          .where("userId", "==", userId)
-          .where("serviceProviderId", "==", shopId)
-          .where("status", "!=", "Completed")
-          .limit(1)
-      );
-    }
     
     // Default user access: users can read/write their own data.
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // New, more specific rule for component writes by service providers.
-    match /users/{userId}/equipment/{equipmentId}/components/{componentId} {
-      allow write: if request.auth != null && hasOpenWorkOrder(userId, request.auth.uid);
+    // This is the new rule that will allow a service provider to update a user's equipment
+    // (e.g., for adding a maintenance log entry or replacing a component) ONLY IF there is an
+    // open work order for that user with that provider.
+    // It is more specific than the old rule and thus takes precedence for these paths.
+    match /users/{userId}/equipment/{equipmentId}/{component=**} {
+      allow write: if request.auth != null && 
+                      exists(
+                        /databases/$(database)/documents/workOrders/
+                          .where("userId", "==", userId)
+                          .where("serviceProviderId", "==", request.auth.uid)
+                          .where("status", "!=", "Completed")
+                      );
     }
     
-    // New rule for equipment writes (like updating maintenance log) by service providers.
-    match /users/{userId}/equipment/{equipmentId} {
-       allow write: if request.auth != null && hasOpenWorkOrder(userId, request.auth.uid);
-    }
-
     // Grant read and write access to equipment data only if the user ID matches the userId field in the equipment document.
+    // This rule is likely for a different data model and we will leave it for compatibility.
     match /equipment/{equipmentId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
