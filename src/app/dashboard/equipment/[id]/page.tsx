@@ -8,15 +8,11 @@ import {
   ChevronLeft,
   Footprints,
   Puzzle,
-  Shield,
-  Pencil,
-  Trash2,
-  Loader2,
-  Zap,
   Wrench,
   PlusCircle,
+  Zap,
 } from 'lucide-react';
-import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
@@ -28,17 +24,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { ComponentStatusList } from '@/components/component-status-list';
 import { MaintenanceLog } from '@/components/maintenance-log';
 import type { Equipment, MaintenanceLog as MaintenanceLogType, Component, MasterComponent, UserComponent } from '@/lib/types';
@@ -46,14 +31,11 @@ import { AccessoriesIcon } from '@/components/icons/accessories-icon';
 import { WheelsetIcon } from '@/components/icons/wheelset-icon';
 import { RimBrakeIcon } from '@/components/icons/rim-brake-icon';
 import { FramesetIcon } from '@/components/icons/frameset-icon';
-import { FitInfoIcon } from '@/components/icons/fit-info-icon';
 import { DrivetrainIcon } from '@/components/icons/drivetrain-icon';
 import { DiscBrakeIcon } from '@/components/icons/disc-brake-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { toDate, toNullableDate, formatDate } from '@/lib/date-utils';
-import { Dialog, DialogTrigger } from '@/components/ui/dialog';
-import { BikeFitDialog } from '@/components/bike-fit-dialog';
 import { EBIKE_TYPES } from '@/lib/constants';
 import { CockpitIcon } from '@/components/icons/cockpit-icon';
 import { AddWheelsetDialog } from '@/components/add-wheelset-dialog';
@@ -101,7 +83,6 @@ export default function EquipmentDetailPage() {
   const [equipment, setEquipment] = useState<Equipment | undefined>();
   const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const clientId = searchParams.get('userId');
 
@@ -152,7 +133,7 @@ export default function EquipmentDetailPage() {
             return {
                 ...masterComp,
                 ...userComp,
-                userComponentId: userComp.id,
+                id: userComp.id,
                 purchaseDate: toDate(userComp.purchaseDate),
                 lastServiceDate: toNullableDate(userComp.lastServiceDate),
             };
@@ -256,7 +237,6 @@ export default function EquipmentDetailPage() {
 
   const Icon = equipment.type.includes('Shoes') ? Footprints : Bike;
   const isShoes = equipment.type === 'Cycling Shoes';
-  const allBikes = allEquipment.filter(e => e.type !== 'Cycling Shoes');
 
   const MainLayout = (
      <>
@@ -279,9 +259,6 @@ export default function EquipmentDetailPage() {
                       <span className="block">{equipment.type}</span>
                     </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                    {/* Edit button removed as requested */}
-                </div>
             </div>
             </CardHeader>
             <CardContent>
@@ -293,14 +270,14 @@ export default function EquipmentDetailPage() {
                 <CardContent className="grid grid-cols-2 text-center pt-6">
                     <div>
                         <p className="text-3xl md:text-4xl font-headline">
-                            {equipment.totalDistance.toFixed(2)}
+                            {(equipment.totalDistance || 0).toFixed(2)}
                             <span className="text-lg md:text-xl font-normal text-muted-foreground"> km</span>
                         </p>
                         <p className="text-xs text-muted-foreground">Total Distance</p>
                     </div>
                     <div>
                         <p className="text-3xl md:text-4xl font-headline">
-                            {equipment.totalHours.toFixed(2)}
+                            {(equipment.totalHours || 0).toFixed(2)}
                             <span className="text-lg md:text-xl font-normal text-muted-foreground"> hrs</span>
                         </p>
                         <p className="text-xs text-muted-foreground">Total Time</p>
@@ -317,7 +294,7 @@ export default function EquipmentDetailPage() {
                     </div>
                     <div>
                         <p className="text-xl md:text-2xl font-headline pt-2">
-                            ${equipment.purchasePrice?.toLocaleString()}
+                            ${equipment.purchasePrice?.toLocaleString() || 'N/A'}
                         </p>
                         <p className="text-xs text-muted-foreground">Price</p>
                     </div>
@@ -392,5 +369,3 @@ export default function EquipmentDetailPage() {
     </div>
   );
 }
-
-    
