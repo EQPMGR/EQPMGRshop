@@ -345,6 +345,31 @@ export default function EquipmentDetailPage() {
             </Card>
             
             <MaintenanceLog log={equipment.maintenanceLog} onAddLog={handleAddLog} />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>All Components (Debug View)</CardTitle>
+                <CardDescription>A raw list of all components associated with this equipment.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {equipment.components.length > 0 ? (
+                  <ul className="space-y-4 text-sm">
+                    {equipment.components.map((component) => (
+                      <li key={component.id} className="border-t pt-4">
+                        <p className="font-bold">{component.componentName || 'Unnamed Component'}</p>
+                        <p>Brand: {component.brand || 'N/A'}</p>
+                        <p>Model: {component.model || 'N/A'}</p>
+                        <p>Series: {(component as any).series || 'N/A'}</p>
+                        <p>System: {component.componentGroup || 'N/A'}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No components found for this equipment.</p>
+                )}
+              </CardContent>
+            </Card>
+
           </div>
           <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-1">
              {associatedShoes.length > 0 && (
