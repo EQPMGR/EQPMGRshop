@@ -51,7 +51,6 @@ import { DrivetrainIcon } from '@/components/icons/drivetrain-icon';
 import { DiscBrakeIcon } from '@/components/icons/disc-brake-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { EditEquipmentDialog } from '@/components/edit-equipment-dialog';
 import { toDate, toNullableDate, formatDate } from '@/lib/date-utils';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { BikeFitDialog } from '@/components/bike-fit-dialog';
@@ -194,52 +193,6 @@ export default function EquipmentDetailPage() {
     }
   }, [user, clientId, authLoading, fetchEquipment, toast]);
   
-  const handleUpdateEquipment = async (data: Partial<Equipment>) => {
-    if (!clientId || !equipment) {
-      toast({ variant: "destructive", title: "Error", description: "Could not update equipment." });
-      return;
-    }
-    
-    const equipmentDocRef = doc(db, 'users', clientId, 'equipment', equipment.id);
-    await updateDoc(equipmentDocRef, data);
-    
-    await fetchEquipment(clientId);
-  };
-
-  const handleDeleteEquipment = async () => {
-    if (!clientId || !equipment) {
-      toast({ variant: "destructive", title: "Error", description: "Could not delete equipment." });
-      return;
-    }
-    setIsDeleting(true);
-    try {
-      const batch = writeBatch(db);
-      
-      const componentsRef = collection(db, 'users', clientId, 'equipment', equipment.id, 'components');
-      const componentsSnap = await getDocs(componentsRef);
-      componentsSnap.forEach(doc => batch.delete(doc.ref));
-
-      const equipmentDocRef = doc(db, 'users', clientId, 'equipment', equipment.id);
-      batch.delete(equipmentDocRef);
-
-      await batch.commit();
-
-      toast({
-        title: "Success!",
-        description: "Equipment has been deleted."
-      });
-
-      router.back();
-    } catch (error) {
-      console.error("Error deleting equipment: ", error);
-      toast({
-        variant: "destructive",
-        title: "Delete failed",
-        description: "An error occurred while deleting the equipment."
-      });
-      setIsDeleting(false);
-    }
-  };
 
   const handleAddLog = async (newLog: Omit<MaintenanceLogType, 'id'>) => {
     if (!clientId || !equipment) return;
@@ -322,19 +275,7 @@ export default function EquipmentDetailPage() {
                     </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                     <Dialog>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" size="icon">
-                                <Pencil className="h-4 w-4" />
-                                <span className="sr-only">Edit Equipment</span>
-                            </Button>
-                        </DialogTrigger>
-                        <EditEquipmentDialog 
-                            equipment={equipment} 
-                            allBikes={allBikes}
-                            onUpdateEquipment={handleUpdateEquipment}
-                        />
-                    </Dialog>
+                    {/* Edit button removed as requested */}
                 </div>
             </div>
             </CardHeader>
