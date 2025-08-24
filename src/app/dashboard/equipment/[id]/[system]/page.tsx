@@ -106,9 +106,9 @@ export default function SystemDetailPage() {
     if (!equipment) return [];
     // A special case for 'brakes' to include both disc and rim brakes
     if (systemName.toLowerCase() === 'brakes') {
-        return equipment.components.filter(c => c.componentGroup.toLowerCase().includes('brake'));
+        return equipment.components.filter(c => c.componentGroup && c.componentGroup.toLowerCase().includes('brake'));
     }
-    return equipment.components.filter(c => c.componentGroup.toLowerCase() === systemName.toLowerCase());
+    return equipment.components.filter(c => c.componentGroup && c.componentGroup.toLowerCase() === systemName.toLowerCase());
   }, [equipment, systemName]);
 
   if (isLoading || authLoading) {
