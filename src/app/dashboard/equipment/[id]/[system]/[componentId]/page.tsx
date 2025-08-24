@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, Wrench, Loader2 } from 'lucide-react';
+import { ChevronLeft, Wrench, Loader2, Replace } from 'lucide-react';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 import { useAuth } from '@/hooks/use-auth';
@@ -17,6 +17,7 @@ import { toDate, toNullableDate, formatDate } from '@/lib/date-utils';
 import type { Component, MasterComponent, UserComponent, MaintenanceLog as MaintenanceLogType, Equipment } from '@/lib/types';
 import { ComponentStatusList } from '@/components/component-status-list';
 import { AddMaintenanceLogDialog } from '@/components/add-maintenance-log-dialog';
+import { ReplaceComponentDialog } from '@/components/replace-component-dialog';
 
 
 export default function ComponentDetailPage() {
@@ -35,7 +36,6 @@ export default function ComponentDetailPage() {
   const fetchComponentData = useCallback(async (uid: string, equipmentId: string, userComponentId: string) => {
     setIsLoading(true);
     try {
-      // Fetch equipment data to get the maintenance log
       const equipmentDocRef = doc(db, 'users', uid, 'equipment', equipmentId);
       const equipmentDocSnap = await getDoc(equipmentDocRef);
 
@@ -239,6 +239,16 @@ export default function ComponentDetailPage() {
              <div className="mt-6 border-t pt-6">
                 <h4 className="font-semibold mb-2">Actions</h4>
                 <div className="flex gap-2 flex-wrap">
+                    {user && clientId && shopName && (
+                        <ReplaceComponentDialog
+                          userId={clientId}
+                          shopId={user.uid}
+                          shopName={shopName}
+                          equipmentId={params.id as string}
+                          componentToReplace={component}
+                          onSuccess={handleSuccess}
+                        />
+                    )}
                     <AddMaintenanceLogDialog onAddLog={handleAddLog}>
                         <Button variant="secondary">
                             <Wrench className="mr-2 h-4 w-4" />
