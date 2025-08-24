@@ -110,7 +110,7 @@ export default function EquipmentDetailPage() {
         
         const masterComponentIds = [...new Set(userComponents.map(c => c.masterComponentId).filter(Boolean))];
         
-        const masterComponentsMap = new Map<string, MasterComponent>();
+        const masterComponentsMap = new Map<string, any>();
         if (masterComponentIds.length > 0) {
              for (let i = 0; i < masterComponentIds.length; i += 30) {
                 const batchIds = masterComponentIds.slice(i, i + 30);
@@ -118,7 +118,7 @@ export default function EquipmentDetailPage() {
                     const masterComponentsQuery = query(collection(db, 'masterComponents'), where('__name__', 'in', batchIds));
                     const querySnapshot = await getDocs(masterComponentsQuery);
                     querySnapshot.forEach(doc => {
-                        masterComponentsMap.set(doc.id, { id: doc.id, ...doc.data() } as MasterComponent);
+                        masterComponentsMap.set(doc.id, { id: doc.id, ...doc.data() });
                     });
                 }
             }
@@ -131,8 +131,12 @@ export default function EquipmentDetailPage() {
                 return null; 
             }
             return {
-                ...masterComp,
                 ...userComp,
+                componentName: masterComp.name, // Use 'name' from master
+                brand: masterComp.brand,
+                model: masterComp.model,
+                series: masterComp.series,
+                componentGroup: masterComp.system, // Use 'system' from master
                 id: userComp.id,
                 purchaseDate: toDate(userComp.purchaseDate),
                 lastServiceDate: toNullableDate(userComp.lastServiceDate),
@@ -394,3 +398,4 @@ export default function EquipmentDetailPage() {
     </div>
   );
 }
+

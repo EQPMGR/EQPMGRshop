@@ -22,14 +22,20 @@ export interface Component extends UserComponent {
   // from MasterComponent
   componentName: string;
   componentGroup: string;
+  brand?: string;
+  model?: string;
+  series?: string;
   lifespanHours?: number | null;
   lifespanDistance?: number | null;
 }
 
 export interface MasterComponent {
   id: string;
-  componentName: string;
-  componentGroup: string;
+  name: string; // Changed from componentName
+  system: string; // Changed from componentGroup
+  brand?: string;
+  model?: string;
+  series?: string;
   lifespanHours?: number;
   lifespanDistance?: number;
 }
