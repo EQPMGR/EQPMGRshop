@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 interface MaintenanceLogProps {
   log: MaintenanceLogType[];
-  onAddLog: (log: Omit<MaintenanceLogType, 'id'>) => void;
+  onAddLog: (log: Omit<MaintenanceLogType, 'id' | 'shopId' | 'shopName'>) => void;
 }
 
 export function MaintenanceLog({ log, onAddLog }: MaintenanceLogProps) {
@@ -138,6 +138,7 @@ export function MaintenanceLog({ log, onAddLog }: MaintenanceLogProps) {
                             <p className="text-xs text-muted-foreground">{formatDate(entry.date)}</p>
                         </div>
                         <p className="text-sm text-muted-foreground capitalize">{entry.serviceType}</p>
+                        {entry.shopName && <p className="text-xs text-muted-foreground">Serviced by: {entry.shopName}</p>}
                         <p className="text-sm mt-1">{entry.notes}</p>
                     </div>
                 </div>

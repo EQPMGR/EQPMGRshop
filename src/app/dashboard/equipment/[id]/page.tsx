@@ -96,7 +96,7 @@ export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, shopName } = useAuth();
   const { toast } = useToast();
   const [equipment, setEquipment] = useState<Equipment | undefined>();
   const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
@@ -195,8 +195,13 @@ export default function EquipmentDetailPage() {
   
 
   const handleAddLog = async (newLog: Omit<MaintenanceLogType, 'id'>) => {
-    if (!clientId || !equipment) return;
-    const logWithId = { ...newLog, id: crypto.randomUUID() };
+    if (!clientId || !equipment || !user || !shopName) return;
+    const logWithId = { 
+        ...newLog,
+        id: crypto.randomUUID(),
+        shopId: user.uid,
+        shopName: shopName,
+    };
     const updatedLog = [...equipment.maintenanceLog, logWithId];
     
     const equipmentDocRef = doc(db, 'users', clientId, 'equipment', equipment.id);

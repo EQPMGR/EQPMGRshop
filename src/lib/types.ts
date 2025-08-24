@@ -51,6 +51,8 @@ export interface MaintenanceLog {
   notes: string;
   serviceType: 'serviced' | 'replaced' | 'inspected';
   cost?: number;
+  shopId?: string;
+  shopName?: string;
 }
 
 export interface CleatPosition {
