@@ -44,7 +44,6 @@ export default function SystemDetailPage() {
         setEquipment({
           ...equipmentData,
           id: equipmentId,
-          // Components and log are fetched separately or handled differently
         } as Equipment);
       } else {
          toast({ variant: "destructive", title: "Not Found", description: "Could not find the requested equipment." });
@@ -131,7 +130,7 @@ export default function SystemDetailPage() {
 
   if (!equipment) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen">
+      <div className="flex flex-col items-center justify-center h-full">
         <div className="text-center">
           <h1 className="text-2xl font-bold">Equipment not found</h1>
           <Button asChild variant="link" onClick={() => router.back()}>
