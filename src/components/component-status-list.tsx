@@ -29,7 +29,7 @@ export function ComponentStatusList({ components }: ComponentStatusListProps) {
           <h3 className="text-sm font-medium text-muted-foreground">Key Component Wear</h3>
           <div className="space-y-3">
               {components.map((component, index) => (
-                  <Tooltip key={component.userComponentId || index}>
+                  <Tooltip key={component.id || index}>
                       <TooltipTrigger className="w-full text-left">
                           <div className="flex justify-between items-center mb-1">
                               <span className="text-sm font-medium">{component.componentName}</span>

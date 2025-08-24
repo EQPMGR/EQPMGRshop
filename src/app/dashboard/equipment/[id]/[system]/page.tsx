@@ -145,9 +145,11 @@ export default function SystemDetailPage() {
   return (
     <div className="p-4 sm:p-6 space-y-4">
        <div className="flex items-center justify-between gap-2 mb-4">
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/dashboard/equipment/${equipment.id}?userId=${clientId}`}>
               <ChevronLeft className="h-4 w-4" />
               Back to {equipment.name}
+            </Link>
           </Button>
       </div>
       <Card>
@@ -160,15 +162,20 @@ export default function SystemDetailPage() {
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredComponents.length > 0 ? (
             filteredComponents.map(component => (
-              <Card key={component.id} className="h-full flex flex-col">
-                <CardHeader>
-                  <CardTitle className="text-lg">{component.componentName}</CardTitle>
-                   <CardDescription>{component.brand} {component.model}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                    <ComponentStatusList components={[component]} />
-                </CardContent>
-              </Card>
+              <Link href={`/dashboard/equipment/${params.id}/${params.system}/${component.id}?userId=${clientId}`} key={component.id} className="block">
+                <Card className="h-full flex flex-col hover:bg-muted/50 cursor-pointer transition-colors">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{component.componentName}</CardTitle>
+                    <CardDescription>{component.brand} {component.model}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                      <ComponentStatusList components={[component]} />
+                  </CardContent>
+                   <div className="p-4 pt-0 text-right">
+                      <Button variant="link" className="p-0 h-auto">View Details <ArrowUpRight className="ml-1 h-4 w-4" /></Button>
+                  </div>
+                </Card>
+              </Link>
             ))
           ) : (
              <div className="text-center py-10 border-2 border-dashed rounded-lg col-span-full">
