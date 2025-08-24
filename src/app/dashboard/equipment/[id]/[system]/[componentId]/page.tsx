@@ -91,8 +91,12 @@ export default function ComponentDetailPage() {
       const mainMasterComp = masterCompsMap.get(mainUserComp.masterComponentId);
       if (mainMasterComp) {
         setComponent({
-          ...mainMasterComp,
           ...mainUserComp,
+          componentName: mainMasterComp.name,
+          brand: mainMasterComp.brand,
+          model: mainMasterComp.model,
+          series: mainMasterComp.series,
+          componentGroup: mainMasterComp.system,
           id: mainUserComp.id,
           purchaseDate: toDate(mainUserComp.purchaseDate),
           lastServiceDate: toNullableDate(mainUserComp.lastServiceDate),
@@ -103,8 +107,12 @@ export default function ComponentDetailPage() {
         const masterComp = masterCompsMap.get(subUserComp.masterComponentId);
         if (!masterComp) return null;
         return {
-          ...masterComp,
           ...subUserComp,
+          componentName: masterComp.name,
+          brand: masterComp.brand,
+          model: masterComp.model,
+          series: masterComp.series,
+          componentGroup: masterComp.system,
           id: subUserComp.id,
           purchaseDate: toDate(subUserComp.purchaseDate),
           lastServiceDate: toNullableDate(subUserComp.lastServiceDate),

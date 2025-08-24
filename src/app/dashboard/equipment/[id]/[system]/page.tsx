@@ -50,42 +50,41 @@ export default function SystemDetailPage() {
          setEquipment(null);
       }
 
-      // 1. Fetch user's components from the subcollection
       const componentsQuery = query(collection(db, 'users', uid, 'equipment', equipmentId, 'components'));
       const componentsSnapshot = await getDocs(componentsQuery);
-      const userComponents: UserComponent[] = componentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserComponent));
+      const userComponents: UserComponent[] = componentsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as UserComponent));
 
-      // 2. Get all unique masterComponentIds
       const masterComponentIds = [...new Set(userComponents.map(c => c.masterComponentId).filter(Boolean))];
       const masterComponentsMap = new Map<string, MasterComponent>();
 
-      // 3. Fetch all master components in batches of 30
       if (masterComponentIds.length > 0) {
            for (let i = 0; i < masterComponentIds.length; i += 30) {
               const batchIds = masterComponentIds.slice(i, i + 30);
                if (batchIds.length > 0) {
                   const masterComponentsQuery = query(collection(db, 'masterComponents'), where('__name__', 'in', batchIds));
                   const querySnapshot = await getDocs(masterComponentsQuery);
-                  querySnapshot.forEach(doc => {
-                      masterComponentsMap.set(doc.id, { id: doc.id, ...doc.data() } as MasterComponent);
+                  querySnapshot.forEach(docSnap => {
+                      masterComponentsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as MasterComponent);
                   });
               }
           }
       }
 
-      // 4. Join the user component data with the master component data
       const combinedComponents: Component[] = userComponents.map(userComp => {
           const masterComp = masterComponentsMap.get(userComp.masterComponentId);
-          // If a master component isn't found, we can't process this user component.
           if (!masterComp) return null; 
           return {
-              ...masterComp, // Spread master data (name, componentGroup, etc.)
-              ...userComp,   // Spread user-specific data (wear, dates, etc.)
-              id: userComp.id, // Ensure userComponent's ID is used for navigation
+              ...userComp,
+              componentName: masterComp.name,
+              brand: masterComp.brand,
+              model: masterComp.model,
+              series: masterComp.series,
+              componentGroup: masterComp.system,
+              id: userComp.id,
               purchaseDate: toDate(userComp.purchaseDate),
               lastServiceDate: toNullableDate(userComp.lastServiceDate),
           };
-      }).filter((c): c is Component => c !== null); // Filter out any nulls from missing master components
+      }).filter((c): c is Component => c !== null); 
       
       setComponents(combinedComponents);
 
@@ -117,18 +116,15 @@ export default function SystemDetailPage() {
     const systemSlug = params.system.replace(/-/g, ' ').toLowerCase();
 
     return components.filter(c => {
-        // Ensure componentGroup exists and is a string before calling .toLowerCase()
         const componentGroup = c.componentGroup ? c.componentGroup.toLowerCase() : '';
         
-        // Handle the special case where the system is "Brakes"
         if (systemSlug === 'brakes') {
             return componentGroup.includes('brake');
         }
         
-        // Default comparison for all other systems
         return componentGroup === systemSlug;
     });
-}, [components, params.system]);
+  }, [components, params.system]);
 
 
   if (isLoading || authLoading) {
@@ -201,4 +197,3 @@ export default function SystemDetailPage() {
     </div>
   );
 }
-

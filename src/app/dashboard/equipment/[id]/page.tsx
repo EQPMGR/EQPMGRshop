@@ -1,4 +1,3 @@
-
 'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -110,7 +109,7 @@ export default function EquipmentDetailPage() {
         
         const masterComponentIds = [...new Set(userComponents.map(c => c.masterComponentId).filter(Boolean))];
         
-        const masterComponentsMap = new Map<string, any>();
+        const masterComponentsMap = new Map<string, MasterComponent>();
         if (masterComponentIds.length > 0) {
              for (let i = 0; i < masterComponentIds.length; i += 30) {
                 const batchIds = masterComponentIds.slice(i, i + 30);
@@ -118,7 +117,7 @@ export default function EquipmentDetailPage() {
                     const masterComponentsQuery = query(collection(db, 'masterComponents'), where('__name__', 'in', batchIds));
                     const querySnapshot = await getDocs(masterComponentsQuery);
                     querySnapshot.forEach(doc => {
-                        masterComponentsMap.set(doc.id, { id: doc.id, ...doc.data() });
+                        masterComponentsMap.set(doc.id, { id: doc.id, ...doc.data() } as MasterComponent);
                     });
                 }
             }
@@ -132,12 +131,12 @@ export default function EquipmentDetailPage() {
             }
             return {
                 ...userComp,
-                componentName: masterComp.name, // Use 'name' from master
+                componentName: masterComp.name,
                 brand: masterComp.brand,
                 model: masterComp.model,
                 series: masterComp.series,
-                componentGroup: masterComp.system, // Use 'system' from master
-                id: userComp.id,
+                componentGroup: masterComp.system,
+                id: userComp.id, // Use the userComponent's ID for navigation and keys
                 purchaseDate: toDate(userComp.purchaseDate),
                 lastServiceDate: toNullableDate(userComp.lastServiceDate),
             };
@@ -349,30 +348,6 @@ export default function EquipmentDetailPage() {
             </Card>
             
             <MaintenanceLog log={equipment.maintenanceLog} onAddLog={handleAddLog} />
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>All Components (Debug View)</CardTitle>
-                <CardDescription>A raw list of all components associated with this equipment.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {equipment.components.length > 0 ? (
-                  <ul className="space-y-4 text-sm">
-                    {equipment.components.map((component) => (
-                      <li key={component.id} className="border-t pt-4">
-                        <p className="font-bold">{component.componentName || 'Unnamed Component'}</p>
-                        <p>Brand: {component.brand || 'N/A'}</p>
-                        <p>Model: {component.model || 'N/A'}</p>
-                        <p>Series: {(component as any).series || 'N/A'}</p>
-                        <p>System: {component.componentGroup || 'N/A'}</p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>No components found for this equipment.</p>
-                )}
-              </CardContent>
-            </Card>
 
           </div>
           <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-1">
@@ -398,4 +373,3 @@ export default function EquipmentDetailPage() {
     </div>
   );
 }
-
