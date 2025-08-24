@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { ChevronLeft, Loader2, ArrowUpRight } from 'lucide-react';
+import { ChevronLeft, ArrowUpRight } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
 import type { Equipment, Component, MasterComponent, UserComponent } from '@/lib/types';
@@ -112,22 +112,15 @@ export default function SystemDetailPage() {
     }
     const systemSlug = params.system.replace(/-/g, ' ').toLowerCase();
 
-    console.log(`Filtering for system slug: "${systemSlug}"`);
-
-    const filtered = components.filter(c => {
+    return components.filter(c => {
         const componentGroup = c.componentGroup ? c.componentGroup.toLowerCase() : '';
         const isMatch = componentGroup === systemSlug;
 
-        // Special case for brakes
+        // Special case for brakes which can be 'disc brake' or 'rim brake'
         const isBrakeMatch = systemSlug === 'brakes' && componentGroup.includes('brake');
-
-        // console.log(`- Checking: "${c.componentName}". Group: "${componentGroup}". Is Match: ${isMatch || isBrakeMatch}`);
         
         return isMatch || isBrakeMatch;
     });
-
-    console.log(`Found ${filtered.length} components after filtering.`);
-    return filtered;
 }, [components, params.system]);
 
 

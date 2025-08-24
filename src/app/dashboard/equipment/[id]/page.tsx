@@ -175,7 +175,7 @@ export default function EquipmentDetailPage() {
   }, [user, clientId, authLoading, fetchEquipment, toast]);
   
 
-  const handleAddLog = async (newLog: Omit<MaintenanceLogType, 'id'>) => {
+  const handleAddLog = async (newLog: Omit<MaintenanceLogType, 'id' | 'shopId' | 'shopName'>) => {
     if (!clientId || !equipment || !user || !shopName) return;
     const logWithId = { 
         ...newLog,
@@ -232,7 +232,7 @@ export default function EquipmentDetailPage() {
   }
 
   const topComponents = [...equipment.components]
-    .sort((a, b) => b.wearPercentage - a.wearPercentage)
+    .sort((a, b) => (b.wearPercentage || 0) - (a.wearPercentage || 0))
     .slice(0, 3);
 
   const Icon = equipment.type.includes('Shoes') ? Footprints : Bike;
@@ -306,7 +306,7 @@ export default function EquipmentDetailPage() {
 
   if (isShoes) {
       return (
-          <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
+          <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2 p-4 sm:p-6">
               {MainLayout}
           </div>
       )
