@@ -23,7 +23,7 @@ export default function ComponentDetailPage() {
   const params = useParams<{ id: string; system: string; componentId: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, shopName } = useAuth();
   const { toast } = useToast();
   const [component, setComponent] = useState<Component | undefined>();
   const [subComponents, setSubComponents] = useState<Component[]>([]);
@@ -67,7 +67,7 @@ export default function ComponentDetailPage() {
 
       const subComponentsQuery = query(componentsCollectionRef, where('parentUserComponentId', '==', userComponentId));
       const subComponentsSnap = await getDocs(subComponentsQuery);
-      const subUserComps = subComponentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserComponent));
+      const subUserComps = subComponentsSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as UserComponent));
 
       const masterIdsToFetch = [
         mainUserComp.masterComponentId,
@@ -83,7 +83,7 @@ export default function ComponentDetailPage() {
             if (batchIds.length > 0) {
                 const masterCompsQuery = query(collection(db, 'masterComponents'), where('__name__', 'in', batchIds));
                 const querySnapshot = await getDocs(masterCompsQuery);
-                querySnapshot.forEach(doc => masterCompsMap.set(doc.id, { id: doc.id, ...doc.data() } as MasterComponent));
+                querySnapshot.forEach(docSnap => masterCompsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as MasterComponent));
             }
           }
       }
@@ -135,9 +135,15 @@ export default function ComponentDetailPage() {
     }
   }
   
-   const handleAddLog = async (newLog: Omit<MaintenanceLogType, 'id'>) => {
-    if (!clientId || !equipment || !user) return;
-    const logWithId = { ...newLog, id: crypto.randomUUID() };
+   const handleAddLog = async (newLog: Omit<MaintenanceLogType, 'id' | 'shopId' | 'shopName'>) => {
+    if (!clientId || !equipment || !user || !shopName) return;
+    const logWithId = { 
+        ...newLog,
+        id: crypto.randomUUID(),
+        shopId: user.uid,
+        shopName: shopName,
+    };
+    
     const updatedLog = [...equipment.maintenanceLog, logWithId];
     
     const equipmentDocRef = doc(db, 'users', clientId, 'equipment', equipment.id);

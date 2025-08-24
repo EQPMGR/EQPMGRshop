@@ -78,7 +78,7 @@ export default function SystemDetailPage() {
           return {
               ...masterComp,
               ...userComp,
-              userComponentId: userComp.id,
+              id: userComp.id, // Ensure the user component ID is used for links
               purchaseDate: toDate(userComp.purchaseDate),
               lastServiceDate: toNullableDate(userComp.lastServiceDate),
           };
