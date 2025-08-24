@@ -3,63 +3,66 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check for an open work order
+
+    // Helper function to check for an open work order between a user and a service provider
     function hasOpenWorkOrder(userId, serviceProviderId) {
-      return exists(/databases/$(database)/documents/workOrders/$(userId)_$(serviceProviderId)) &&
-             get(/databases/$(database)/documents/workOrders/$(userId)_$(serviceProviderId)).data.status != 'Completed';
+      return exists(/databases/$(database)/documents/workOrders/{workOrderId})
+             && get(/databases/$(database)/documents/workOrders/{workOrderId}).data.userId == userId
+             && get(/databases/$(database)/documents/workOrders/{workOrderId}).data.serviceProviderId == serviceProviderId
+             && get(/databases/$(database)/documents/workOrders/{workOrderId}).data.status != 'Completed';
     }
 
-    // Users can only read and write their own data.
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      // Rules for the equipment subcollection
-      match /equipment/{equipmentId} {
-        // A user can manage their own equipment
-        // A service provider can update equipment if an open work order exists for that user
-        allow read: if request.auth != null && request.auth.uid == userId;
-        allow write: if request.auth != null && (
-          request.auth.uid == userId ||
-          (exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)) &&
-           get(/databases/$(database)/documents/workOrders).where("userId", "==", userId).where("serviceProviderId", "==", request.auth.uid).where("status", "!=", "Completed").get().size() > 0)
-        );
-
-        // Rules for the components subcollection within equipment
-        match /components/{componentId} {
-          // A user can manage their own components
-          // A service provider can manage components if an open work order exists
-          allow read: if request.auth != null && request.auth.uid == userId;
-          allow write: if request.auth != null && (
-            request.auth.uid == userId ||
-            (exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/workOrders).where("userId", "==", userId).where("serviceProviderId", "==", request.auth.uid).where("status", "!=", "Completed").get().size() > 0)
-          );
-        }
-      }
+    match /users/{userId}/{document=**} {
+      // Users can always read and write their own documents.
+      // A shop (service provider) can read/write a user's document if there's an open work order.
+      allow read, write: if request.auth != null && (
+        request.auth.uid == userId ||
+        (exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)) &&
+         hasOpenWorkOrder(userId, request.auth.uid))
+      );
     }
 
-    // Service providers can be read by anyone, but only written to by the owner.
-    match /serviceProviders/{serviceProviderId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == serviceProviderId;
-    }
-    
-    // Employees can only be managed by the shop owner
-    match /employees/{employeeId} {
-        allow read, write: if request.auth != null && request.resource.data.shopId == request.auth.uid;
+    // Grant read and write access to equipment data only if the user ID matches the userId field in the equipment document.
+    // This rule seems specific to a different data model and is superseded by /users/{userId}/equipment/{equipmentId}
+    // but is kept for compatibility.
+    match /equipment/{equipmentId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Work orders can be created by the user, and read/updated by the user or the assigned shop.
-    match /workOrders/{workOrderId} {
-        allow read, update: if request.auth != null && (request.auth.uid == resource.data.userId || request.auth.uid == resource.data.serviceProviderId);
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-    }
-
-    // Master components are read-only for authenticated users.
-    match /masterComponents/{componentId} {
+    // Authenticated users can read the global data.
+    match /bikeModels/{bikeId} {
       allow read: if request.auth != null;
-      allow write: if false; // Should only be written to by admin/backend processes
+    }
+    match /serviceProviders/{providerId} {
+        allow read: if request.auth != null;
+    }
+    match /masterComponents/{componentId} {
+      // Allow signed-in users to read all master components.
+      // Allow signed-in users to write (create, update, delete) to master components for admin functionality.
+      allow read, write: if request.auth != null;
+    }
+     match /ignoredDuplicates/{key} {
+      allow read, write: if request.auth != null;
+    }
+    match /trainingData/{docId} {
+      allow write: if request.auth != null;
+    }
+    // Any authenticated user can create their own document in the 'serviceProviders' collection
+    // and can only read/write their own document after it's created.
+    match /serviceProviders/{userId} {
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /workOrders/{workOrderId} {
+      allow read, write: if request.auth != null && (request.auth.uid == resource.data.serviceProviderId || request.auth.uid == resource.data.userId);
+    }
+
+    match /employees/{employeeId} {
+      // Allow read/list if the user's UID matches the shopId in the query.
+      allow read, delete, update: if request.auth != null && request.auth.uid == resource.data.shopId;
+      // Allow create if the user's UID matches the shopId in the new document.
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.shopId;
     }
   }
 }
