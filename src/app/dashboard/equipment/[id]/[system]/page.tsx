@@ -107,14 +107,28 @@ export default function SystemDetailPage() {
   }, [user, clientId, params.id, authLoading, fetchEquipmentAndComponents, toast]);
 
   const filteredComponents = useMemo(() => {
-    if (!components) return [];
+    if (!components || components.length === 0) {
+        return [];
+    }
     const systemSlug = params.system.replace(/-/g, ' ').toLowerCase();
 
-    if (systemSlug === 'brakes') {
-      return components.filter(c => c.componentGroup && c.componentGroup.toLowerCase().includes('brake'));
-    }
-    return components.filter(c => c.componentGroup && c.componentGroup.toLowerCase() === systemSlug);
-  }, [components, params.system]);
+    console.log(`Filtering for system slug: "${systemSlug}"`);
+
+    const filtered = components.filter(c => {
+        const componentGroup = c.componentGroup ? c.componentGroup.toLowerCase() : '';
+        const isMatch = componentGroup === systemSlug;
+
+        // Special case for brakes
+        const isBrakeMatch = systemSlug === 'brakes' && componentGroup.includes('brake');
+
+        // console.log(`- Checking: "${c.componentName}". Group: "${componentGroup}". Is Match: ${isMatch || isBrakeMatch}`);
+        
+        return isMatch || isBrakeMatch;
+    });
+
+    console.log(`Found ${filtered.length} components after filtering.`);
+    return filtered;
+}, [components, params.system]);
 
 
   if (isLoading || authLoading) {
