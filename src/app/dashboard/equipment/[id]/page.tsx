@@ -311,7 +311,7 @@ export default function EquipmentDetailPage() {
                 <CardContent className="grid grid-cols-2 text-center pt-6">
                     <div>
                         <p className="text-xl md:text-2xl font-headline pt-2">
-                            {formatDate(equipment.purchaseDate, user?.dateFormat)}
+                            {formatDate(equipment.purchaseDate)}
                         </p>
                         <p className="text-xs text-muted-foreground">Purchased</p>
                     </div>
@@ -355,14 +355,14 @@ export default function EquipmentDetailPage() {
               </CardHeader>
               <CardContent className="p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
                   {systemsToDisplay.map(systemName => (
-                    <div key={systemName} className="hover:bg-muted/50 cursor-pointer transition-colors h-full">
-                       <Card className="h-full">
+                    <Link href={`/dashboard/equipment/${equipment.id}/${systemName.toLowerCase().replace(/\s+/g, '-')}?userId=${clientId}`} key={systemName}>
+                       <Card className="hover:bg-muted/50 cursor-pointer transition-colors h-full">
                           <CardContent className="flex flex-col items-center justify-center p-4 sm:p-6 gap-2">
                             <ComponentIcon componentName={systemName} className="h-[40px] w-[40px] text-muted-foreground" />
                             <h4 className="text-sm font-headline font-bold uppercase text-center tracking-wider">{systemName}</h4>
                           </CardContent>
                         </Card>
-                    </div>
+                    </Link>
                   ))}
               </CardContent>
             </Card>
@@ -392,3 +392,5 @@ export default function EquipmentDetailPage() {
     </div>
   );
 }
+
+    
