@@ -60,7 +60,7 @@ export async function replaceUserComponentAction({
         const componentToReplaceRef = doc(db, `users/${userId}/equipment/${equipmentId}/components/${userComponentIdToReplace}`);
         const componentToReplaceSnap = await getDoc(componentToReplaceRef);
         
-        if (!componentToReplaceSnap.exists) {
+        if (!componentToReplaceSnap.exists()) {
              throw new Error(`Component with ID ${userComponentIdToReplace} not found.`);
         }
         const componentData = componentToReplaceSnap.data() as UserComponent;
@@ -76,7 +76,6 @@ export async function replaceUserComponentAction({
         if (!equipmentDocSnap.exists()) {
             throw new Error("Equipment not found in user data.");
         }
-        const equipmentData = equipmentDocSnap.data();
 
         let finalNewMasterComponentId: string;
         let newComponentSize: string | undefined;
@@ -85,7 +84,7 @@ export async function replaceUserComponentAction({
         if (newMasterComponentId) {
             finalNewMasterComponentId = newMasterComponentId;
             const newMasterCompDoc = await getDoc(doc(db, `masterComponents/${finalNewMasterComponentId}`));
-            if (!newMasterCompDoc.exists) {
+            if (!newMasterCompDoc.exists()) {
                 throw new Error("Selected replacement component not found in database.");
             }
             const masterData = newMasterCompDoc.data() as MasterComponent
@@ -129,7 +128,7 @@ export async function replaceUserComponentAction({
             date: new Date(),
             componentName: masterComponentToReplace.name,
             serviceType: 'replaced',
-            notes: `Replaced ${masterComponentToReplace.name} (${masterComponentToReplace.brand}) with ${newComponentDetails.brand} ${newComponentDetails.model || ''}. Reason: ${replacementReason}.`,
+            notes: `Replaced ${masterComponentToReplace.name} (${masterComponentToReplace.brand || ''}) with ${newComponentDetails.brand || ''} ${newComponentDetails.model || ''}. Reason: ${replacementReason}.`,
             shopId: shopId,
             shopName: shopName,
         };
@@ -148,9 +147,11 @@ export async function replaceUserComponentAction({
             lastServiceDate: null,
             notes: `Replaced by ${shopName} on ${new Date().toLocaleDateString()}`,
             size: newComponentSize || undefined,
+            // Preserve fields from the old component that should carry over
+            parentUserComponentId: componentData.parentUserComponentId,
         };
         
-        const cleanData = Object.fromEntries(Object.entries(newUserComponentData).filter(([, v]) => v !== undefined));
+        const cleanData = Object.fromEntries(Object.entries(newUserComponentData).filter(([, v]) => v !== undefined && v !== null));
         batch.set(componentToReplaceRef, cleanData);
         
         await batch.commit();

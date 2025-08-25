@@ -38,6 +38,7 @@ export interface MasterComponent {
   series?: string;
   lifespanHours?: number;
   lifespanDistance?: number;
+  size?: string;
 }
 
 export interface UserComponent {
@@ -48,6 +49,9 @@ export interface UserComponent {
   totalDistance: number;
   totalHours: number;
   wearPercentage: number;
+  notes?: string;
+  size?: string;
+  parentUserComponentId?: string;
 }
 
 export interface MaintenanceLog {
