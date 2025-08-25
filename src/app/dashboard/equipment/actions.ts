@@ -1,6 +1,6 @@
 'use server';
 
-import { FieldValue, Timestamp } from 'firebase/firestore';
+import { FieldValue, Timestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { doc, writeBatch, collection, getDoc, deleteDoc } from 'firebase/firestore';
 import type { UserComponent, MasterComponent, MaintenanceLog } from '@/lib/types';
@@ -114,7 +114,7 @@ export async function replaceUserComponentAction({
             newComponentSize = manualNewComponentData.size;
             
             const cleanNewComponentDetails = Object.fromEntries(
-                Object.entries(newComponentDetails).filter(([, v]) => v != null)
+                Object.entries(newComponentDetails).filter(([, v]) => v != null && v !== '')
             );
 
             const newMasterComponentRef = doc(db, `masterComponents/${finalNewMasterComponentId}`);
@@ -124,34 +124,42 @@ export async function replaceUserComponentAction({
         }
 
         const newLogEntry: MaintenanceLog = {
-            id: doc(collection(db, 'tmp')).id,
+            id: doc(collection(db, 'tmp')).id, // Firestore will generate an ID on the client
             date: new Date(),
             componentName: masterComponentToReplace.name,
             serviceType: 'replaced',
-            notes: `Replaced ${masterComponentToReplace.name} (${masterComponentToReplace.brand || ''}) with ${newComponentDetails.brand || ''} ${newComponentDetails.model || ''}. Reason: ${replacementReason}.`,
+            notes: `Replaced ${masterComponentToReplace.brand || ''} ${masterComponentToReplace.model || ''} with ${newComponentDetails.brand || ''} ${newComponentDetails.model || ''}. Reason: ${replacementReason}.`,
             shopId: shopId,
             shopName: shopName,
         };
+        
+        // Ensure log entry is clean before converting to Firestore Timestamp
+        const cleanLogEntry = {
+            ...newLogEntry,
+            date: Timestamp.fromDate(newLogEntry.date),
+        };
 
         batch.update(equipmentDocRef, {
-            maintenanceLog: FieldValue.arrayUnion({
-                ...newLogEntry,
-                date: Timestamp.fromDate(newLogEntry.date),
-            })
+            maintenanceLog: arrayUnion(cleanLogEntry)
         });
 
-        const newUserComponentData: Partial<UserComponent> = {
+        const newUserComponentData: Omit<UserComponent, 'id'> = {
             masterComponentId: finalNewMasterComponentId,
             wearPercentage: 0,
+            totalDistance: 0,
+            totalHours: 0,
             purchaseDate: new Date(),
             lastServiceDate: null,
             notes: `Replaced by ${shopName} on ${new Date().toLocaleDateString()}`,
-            size: newComponentSize || undefined,
-            // Preserve fields from the old component that should carry over
+            size: newComponentSize,
             parentUserComponentId: componentData.parentUserComponentId,
         };
         
-        const cleanData = Object.fromEntries(Object.entries(newUserComponentData).filter(([, v]) => v !== undefined && v !== null));
+        // Critically, remove any undefined properties before sending to Firestore.
+        const cleanData = Object.fromEntries(
+            Object.entries(newUserComponentData).filter(([, v]) => v !== undefined)
+        );
+
         batch.set(componentToReplaceRef, cleanData);
         
         await batch.commit();
@@ -163,7 +171,8 @@ export async function replaceUserComponentAction({
         if ((error as any).code === 'permission-denied' || (error as any).code === 7) {
             throw new Error('A permission error occurred. This may be due to Firestore security rules.');
         }
-        throw new Error((error as Error).message || 'An unexpected error occurred.');
+        // This will now catch the data validation errors and report them.
+        throw new Error((error as Error).message || 'An unexpected error occurred during component replacement.');
     }
 }
 
