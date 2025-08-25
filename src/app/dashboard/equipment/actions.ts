@@ -148,7 +148,7 @@ export async function replaceUserComponentAction({
             parentUserComponentId: componentData.parentUserComponentId,
         };
         
-        // Critically, remove any undefined or null properties before sending to Firestore.
+        // Critically, remove any undefined properties before sending to Firestore.
         const cleanData = Object.fromEntries(Object.entries(newUserComponentData).filter(([, value]) => {
             return value !== undefined && value !== null;
         }));
