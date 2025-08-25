@@ -155,10 +155,13 @@ export async function replaceUserComponentAction({
             parentUserComponentId: componentData.parentUserComponentId,
         };
         
-        // Critically, remove any undefined properties before sending to Firestore.
-        const cleanData = Object.fromEntries(
-            Object.entries(newUserComponentData).filter(([, v]) => v !== undefined)
-        );
+        // Critically, remove any undefined or null properties before sending to Firestore.
+        const cleanData = Object.entries(newUserComponentData).reduce((acc, [key, value]) => {
+            if (value !== undefined && value !== null) {
+                (acc as any)[key] = value;
+            }
+            return acc;
+        }, {} as Partial<UserComponent>);
 
         batch.set(componentToReplaceRef, cleanData);
         
