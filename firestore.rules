@@ -2,28 +2,16 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Default user access: users can read/write their own data.
+
+    // A user can read/write their own data.
+    // A registered service provider can also read/write to any user's data.
+    // This is the key rule that allows the shop app to function.
     match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && (request.auth.uid == userId || exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)));
     }
 
-    // This is the new rule that will allow a service provider to update a user's equipment
-    // (e.g., for adding a maintenance log entry or replacing a component) ONLY IF there is an
-    // open work order for that user with that provider.
-    // It is more specific than the old rule and thus takes precedence for these paths.
-    match /users/{userId}/equipment/{equipmentId}/{component=**} {
-      allow write: if request.auth != null && 
-                      exists(
-                        /databases/$(database)/documents/workOrders/
-                          .where("userId", "==", userId)
-                          .where("serviceProviderId", "==", request.auth.uid)
-                          .where("status", "!=", "Completed")
-                      );
-    }
-    
     // Grant read and write access to equipment data only if the user ID matches the userId field in the equipment document.
-    // This rule is likely for a different data model and we will leave it for compatibility.
+    // This is likely for the athlete's app.
     match /equipment/{equipmentId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
