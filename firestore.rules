@@ -3,15 +3,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // A user can read/write their own data.
-    // A registered service provider can also read/write to any user's data.
-    // This is the key rule that allows the shop app to function.
+    // A user can read/write their own data. A registered service provider can also read/write to any user's data.
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && (request.auth.uid == userId || exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)));
     }
 
     // Grant read and write access to equipment data only if the user ID matches the userId field in the equipment document.
-    // This is likely for the athlete's app.
     match /equipment/{equipmentId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
