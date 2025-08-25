@@ -4,10 +4,15 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Allow a user to read/write their own data. Also allow a registered
-    // service provider to read/write any user's data. This is a common pattern
-    // for trusted partner applications.
+    // service provider to read/write any user's data.
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && (request.auth.uid == userId || exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)));
+    }
+
+    // Explicitly allow service providers to write to the components subcollection.
+    // This resolves ambiguity for batched write operations.
+    match /users/{userId}/equipment/{equipmentId}/components/{componentId} {
+       allow write: if request.auth != null && exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid));
     }
 
     // Grant read and write access to top-level equipment data only if the user ID matches the userId field in the equipment document.
