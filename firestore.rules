@@ -3,23 +3,23 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow a user to read/write their own document.
-    match /users/{userId} {
+    // A user can always read and write their own data.
+    match /users/{userId}/{path=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Explicitly allow a service provider to read/write a user's equipment document.
+    // A service provider can read and write a user's equipment document.
     match /users/{userId}/equipment/{equipmentId} {
-       allow read, write: if request.auth != null && (request.auth.uid == userId || exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)));
-    }
-    
-    // Explicitly allow a service provider to read/write to the components subcollection.
-    match /users/{userId}/equipment/{equipmentId}/components/{componentId} {
-        allow read, write: if request.auth != null && (request.auth.uid == userId || exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)));
+      allow read, write: if request.auth != null && exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid));
     }
 
-    // Grant read and write access to top-level equipment data only if the user ID matches the userId field in the equipment document.
-    // This might be for an older data model, but we'll keep it for compatibility.
+    // A service provider can read and write a user's component documents.
+    // This explicit rule is crucial for the batched write.
+    match /users/{userId}/equipment/{equipmentId}/components/{componentId} {
+      allow read, write: if request.auth != null && exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid));
+    }
+
+    // This is a legacy rule from the athlete's app, kept for compatibility.
     match /equipment/{equipmentId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
@@ -32,8 +32,6 @@ service cloud.firestore {
         allow read: if request.auth != null;
     }
     match /masterComponents/{componentId} {
-      // Allow signed-in users to read all master components.
-      // Allow signed-in users to write (create, update, delete) to master components for admin functionality.
       allow read, write: if request.auth != null;
     }
      match /ignoredDuplicates/{key} {
