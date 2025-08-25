@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { collection, query, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Component, MasterComponent } from '@/lib/types';
-import { replaceUserComponentAction } from '@/app/dashboard/equipment/actions';
+import { replaceUserComponentAction } from '../app/dashboard/equipment/actions';
 import {
   Dialog,
   DialogContent,
