@@ -1,3 +1,4 @@
+
 'use server';
 
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
@@ -72,7 +73,11 @@ export async function replaceUserComponentAction({
         const masterComponentToReplace = { id: masterComponentSnap.id, ...masterComponentSnap.data() } as MasterComponent;
         
         const equipmentDocRef = adminDb.doc(`users/${userId}/equipment/${equipmentId}`);
-        
+        const equipmentDocSnap = await equipmentDocRef.get();
+        if (!equipmentDocSnap.exists) {
+            throw new Error("Equipment not found in user data.");
+        }
+
         let finalNewMasterComponentId: string;
         let newComponentSize: string | undefined;
         let newComponentDetails: Partial<MasterComponent>;
@@ -120,7 +125,7 @@ export async function replaceUserComponentAction({
         }
 
         const newLogEntry: MaintenanceLog = {
-            id: adminDb.collection('tmp').doc().id,
+            id: adminDb.collection('tmp').doc().id, // Firestore will generate an ID on the client
             date: new Date(),
             componentName: masterComponentToReplace.name,
             serviceType: 'replaced',
@@ -129,11 +134,14 @@ export async function replaceUserComponentAction({
             shopName: shopName,
         };
         
+        // Ensure log entry is clean before converting to Firestore Timestamp
+        const cleanLogEntry = {
+            ...newLogEntry,
+            date: Timestamp.fromDate(newLogEntry.date),
+        };
+
         batch.update(equipmentDocRef, {
-            maintenanceLog: FieldValue.arrayUnion({
-                ...newLogEntry,
-                date: Timestamp.fromDate(newLogEntry.date),
-            })
+            maintenanceLog: FieldValue.arrayUnion(cleanLogEntry)
         });
 
         const newUserComponentData: Omit<UserComponent, 'id'> = {
@@ -149,9 +157,19 @@ export async function replaceUserComponentAction({
         };
         
         // Critically, remove any undefined properties before sending to Firestore.
-        const cleanData = Object.fromEntries(Object.entries(newUserComponentData).filter(([, value]) => {
-            return value !== undefined && value !== null;
-        }));
+        const cleanData: {[k:string]: any} = {};
+        for (const key in newUserComponentData) {
+            const typedKey = key as keyof typeof newUserComponentData;
+            if (newUserComponentData[typedKey] !== undefined) {
+                 cleanData[key] = newUserComponentData[typedKey];
+            }
+        }
+        if(cleanData.purchaseDate) {
+            cleanData.purchaseDate = Timestamp.fromDate(cleanData.purchaseDate);
+        }
+        if(cleanData.lastServiceDate === null) {
+            delete cleanData.lastServiceDate;
+        }
 
         batch.set(componentToReplaceRef, cleanData);
         
@@ -161,8 +179,10 @@ export async function replaceUserComponentAction({
 
     } catch (error) {
         console.error("[SERVER ACTION ERROR] in replaceUserComponentAction:", error);
-        // We don't check for permission-denied here because Admin SDK bypasses rules.
-        // Any error here is a true server-side crash or data issue.
+        if ((error as any).code === 'permission-denied' || (error as any).code === 7) {
+            throw new Error('A permission error occurred. This may be due to Firestore security rules.');
+        }
+        // This will now catch the data validation errors and report them.
         throw new Error((error as Error).message || 'An unexpected error occurred during component replacement.');
     }
 }
