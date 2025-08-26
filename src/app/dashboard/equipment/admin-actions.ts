@@ -1,6 +1,6 @@
 
 'use server';
-
+import 'dotenv/config';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase-admin';
 import type { UserComponent, MasterComponent, MaintenanceLog } from '@/lib/types';
