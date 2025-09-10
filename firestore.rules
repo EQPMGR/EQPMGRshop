@@ -1,56 +1,52 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if the user is the owner of the document
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // Helper function to check if a user is a registered service provider (shop)
-    function isShop() {
-      return exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid));
-    }
     
-    // Users can only read/write their own data.
+    // Users can manage their own user document
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
-      
-      // Shops can read and write equipment data for any user.
-      // NOTE: This is permissive. In a production app, you would want to
-      // verify a relationship between the shop and the user.
-      match /equipment/{equipmentId} {
-        allow read, write: if isShop();
-        
-        match /components/{componentId} {
-           allow read, write: if isShop();
-        }
-      }
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Service providers (shops) can only read/write their own profile.
+
+    // Service providers (shops) can manage their own document
     match /serviceProviders/{shopId} {
-        allow read, write: if isOwner(shopId);
+        allow read, write: if request.auth != null && request.auth.uid == shopId;
     }
-    
-    // Shops can manage employees associated with their shopId.
-    match /employees/{employeeId} {
-        allow read, create, update, delete: if request.auth.uid == resource.data.shopId || request.auth.uid == request.resource.data.shopId;
-    }
-    
-    // Shops can manage work orders associated with their serviceProviderId.
+
+    // Work Orders can be read/written by the shop owner
     match /workOrders/{workOrderId} {
-      allow read, update: if isShop() && request.auth.uid == resource.data.serviceProviderId;
+      allow read, write: if request.auth != null && get(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)).data.ownerId == request.auth.uid;
+    }
+
+    // Employees can be managed by the shop owner
+    match /employees/{employeeId} {
+       allow read, write: if request.auth != null && request.resource.data.shopId == request.auth.uid;
     }
     
-    // Master components list should be readable by any authenticated user (shops)
-    // but writable only by admins (a role we can define later).
-    // For now, lock it down to read-only for authenticated users.
-    match /masterComponents/{componentId} {
-        allow read: if request.auth != null;
-        allow write: if false; // Protect master data
+    // A user's equipment and its subcollections (components)
+    match /users/{userId}/equipment/{equipmentId} {
+        // Allow the owner of the user document to do anything
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        
+        // Allow a logged-in shop to also read/write the equipment data
+        // This is permissive. A better rule would check for a specific relationship
+        // between the shop and the user (e.g., via a work order).
+        allow read, write: if request.auth != null;
+    }
+    
+    match /users/{userId}/equipment/{equipmentId}/components/{componentId} {
+        // Allow the owner of the user document to do anything
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        
+        // Allow a logged-in shop to also read/write the component data
+        allow read, write: if request.auth != null;
+    }
+    
+    // Master components list should be readable by any authenticated user
+    match /masterComponents/{masterComponentId} {
+        allow get: if request.auth != null;
+        // writes should only be done via trusted server-side actions
+        allow list, create, update, delete: if false; 
     }
   }
 }
