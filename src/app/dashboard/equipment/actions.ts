@@ -1,7 +1,7 @@
 
 'use server';
 
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb as getAdminDb } from '@/lib/firebase-admin';
 import type { UserComponent } from '@/lib/types';
 
 
@@ -14,6 +14,7 @@ export async function deleteUserComponentAction({
     equipmentId: string;
     userComponentId: string;
 }) {
+    const adminDb = await getAdminDb();
     if (!userId || !equipmentId || !userComponentId) {
         throw new Error("Missing required parameters for component deletion.");
     }

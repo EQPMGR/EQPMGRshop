@@ -2,7 +2,7 @@
 'use server';
 import 'dotenv/config';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb as getAdminDb } from '@/lib/firebase-admin';
 import type { UserComponent, MasterComponent, MaintenanceLog } from '@/lib/types';
 
 
@@ -46,6 +46,8 @@ export async function replaceUserComponentAction({
     shopId: string;
     shopName: string;
 }) {
+    const adminDb = await getAdminDb();
+
     if (!userId || !equipmentId || !userComponentIdToReplace) {
         throw new Error("Missing required parameters for component replacement.");
     }

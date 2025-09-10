@@ -4,22 +4,27 @@ import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getFirebaseSecrets } from "./secrets";
 
-// Initialize Firebase Admin SDK
 let app: App;
 
-async function initializeAdminApp() {
-  if (!getApps().length) {
-    const secrets = await getFirebaseSecrets();
-    app = initializeApp({
-      credential: cert(secrets),
-    });
-  }
+if (!getApps().length) {
+  // We can't use top-level await, so we can't call getFirebaseSecrets here directly.
+  // We will initialize on first use of the database instance instead.
 }
 
-// We call this function to ensure the app is initialized before we export the db
-initializeAdminApp();
+let adminDb: ReturnType<typeof getFirestore>;
 
-// Export the initialized Firestore instance
-const adminDb = getFirestore(app);
+async function getDb() {
+    if (!adminDb) {
+        if (!getApps().length) {
+            const secrets = await getFirebaseSecrets();
+            app = initializeApp({
+                credential: cert(secrets),
+            });
+        }
+        adminDb = getFirestore(getApps()[0]);
+    }
+    return adminDb;
+}
 
-export { adminDb };
+// We export a getter function now to handle the async initialization
+export { getDb as adminDb };
