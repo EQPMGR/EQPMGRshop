@@ -9,6 +9,7 @@
  */
 
 import { ai } from '@/ai/genkit';
+import { getGeminiApiKey } from '@/lib/secrets';
 import { z } from 'genkit';
 
 const GeocodeInputSchema = z.string().describe("The full address to geocode.");
@@ -38,9 +39,9 @@ const getCoordinatesTool = ai.defineTool(
         }),
     },
     async (input) => {
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = await getGeminiApiKey();
         if (!apiKey) {
-            throw new Error('Google Geocoding API key (GEMINI_API_KEY) is missing.');
+            throw new Error('Google Geocoding API key (GEMINI_API_KEY) is missing from Secret Manager.');
         }
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(input.address)}&key=${apiKey}`;
         
@@ -142,4 +143,5 @@ const geocodeFlow = ai.defineFlow(
     };
   }
 );
+
 

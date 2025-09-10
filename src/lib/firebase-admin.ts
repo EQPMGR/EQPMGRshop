@@ -1,18 +1,18 @@
 import "server-only";
 import * as admin from 'firebase-admin';
-
-const serviceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-};
+import { getFirebaseSecrets } from "./secrets";
 
 let adminDb: admin.firestore.Firestore;
 
 export async function getAdminDb() {
   if (!admin.apps.length) {
+    const secrets = await getFirebaseSecrets();
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: admin.credential.cert({
+        projectId: secrets.projectId,
+        clientEmail: secrets.clientEmail,
+        privateKey: secrets.privateKey,
+      }),
     });
   }
 
