@@ -1,52 +1,57 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Users can manage their own user document
+    // Users can read and write to their own user document.
+    // Shops (service providers) can read any user's document.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth.uid == userId;
+      allow read: if exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid));
     }
 
-    // Service providers (shops) can manage their own document
+    // Service providers (shops) can be read by anyone (so users can find them).
+    // Only the shop owner can create or update their own provider document.
     match /serviceProviders/{shopId} {
-        allow read, write: if request.auth != null && request.auth.uid == shopId;
+      allow read: if true;
+      allow create, update, delete: if request.auth.uid == shopId;
     }
-
-    // Work Orders can be read/written by the shop owner
+    
+    // An individual user can create work orders.
+    // A shop can read/update work orders assigned to them.
+    // The user who created the work order can also read/update it.
     match /workOrders/{workOrderId} {
-      allow read, write: if request.auth != null && get(/databases/$(database)/documents/serviceProviders/$(request.auth.uid)).data.ownerId == request.auth.uid;
+      allow read, update: if request.auth.uid == resource.data.serviceProviderId || request.auth.uid == resource.data.userId;
+      allow create: if request.auth.uid == request.resource.data.userId;
+      // Prevent deletion for now to maintain history.
+      allow delete: if false; 
     }
-
-    // Employees can be managed by the shop owner
+    
+    // Employees can only be managed by the shop owner they are assigned to.
     match /employees/{employeeId} {
-       allow read, write: if request.auth != null && request.resource.data.shopId == request.auth.uid;
+      allow read, write, create, delete: if request.auth.uid == request.resource.data.shopId || request.auth.uid == resource.data.shopId;
     }
     
-    // A user's equipment and its subcollections (components)
+    // User-specific subcollections for equipment and components
     match /users/{userId}/equipment/{equipmentId} {
-        // Allow the owner of the user document to do anything
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-        
-        // Allow a logged-in shop to also read/write the equipment data
-        // This is permissive. A better rule would check for a specific relationship
-        // between the shop and the user (e.g., via a work order).
-        allow read, write: if request.auth != null;
+      // The owner of the equipment can do anything.
+      // A shop owner can read/write it. This allows them to service the equipment.
+      allow read, write: if request.auth.uid == userId 
+                         || exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid));
+
+      // Components follow the same rules as the equipment they belong to.
+      match /components/{componentId} {
+        allow read, write: if request.auth.uid == userId
+                           || exists(/databases/$(database)/documents/serviceProviders/$(request.auth.uid));
+      }
     }
     
-    match /users/{userId}/equipment/{equipmentId}/components/{componentId} {
-        // Allow the owner of the user document to do anything
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-        
-        // Allow a logged-in shop to also read/write the component data
-        allow read, write: if request.auth != null;
-    }
-    
-    // Master components list should be readable by any authenticated user
-    match /masterComponents/{masterComponentId} {
-        allow get: if request.auth != null;
-        // writes should only be done via trusted server-side actions
-        allow list, create, update, delete: if false; 
+    // Master components list should be readable by authenticated users (shops need it)
+    // but only writable by an admin role (not implemented yet, so locked down).
+    match /masterComponents/{componentId} {
+        allow read: if request.auth != null;
+        allow write: if false; // Protect this data
     }
   }
 }
