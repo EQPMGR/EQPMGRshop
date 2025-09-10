@@ -1,7 +1,7 @@
 
 'use server';
 
-import { getAdminDb } from '@/lib/firebase-admin';
+import { adminDb } from '@/lib/firebase-admin';
 import type { UserComponent } from '@/lib/types';
 
 
@@ -19,7 +19,6 @@ export async function deleteUserComponentAction({
     }
 
     try {
-        const adminDb = await getAdminDb();
         const componentRef = adminDb.doc(`users/${userId}/equipment/${equipmentId}/components/${userComponentId}`);
         await componentRef.delete();
         return { success: true, message: "Component deleted successfully." };

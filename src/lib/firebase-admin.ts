@@ -1,20 +1,25 @@
+
 import "server-only";
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { getFirebaseSecrets } from "./secrets";
 
-let adminDb: admin.firestore.Firestore;
+// Initialize Firebase Admin SDK
+let app: App;
 
-export async function getAdminDb() {
-  if (!admin.apps.length) {
+async function initializeAdminApp() {
+  if (!getApps().length) {
     const secrets = await getFirebaseSecrets();
-    admin.initializeApp({
-      credential: admin.credential.cert(secrets),
+    app = initializeApp({
+      credential: cert(secrets),
     });
   }
-
-  if (!adminDb) {
-    adminDb = admin.firestore();
-  }
-
-  return adminDb;
 }
+
+// We call this function to ensure the app is initialized before we export the db
+initializeAdminApp();
+
+// Export the initialized Firestore instance
+const adminDb = getFirestore(app);
+
+export { adminDb };

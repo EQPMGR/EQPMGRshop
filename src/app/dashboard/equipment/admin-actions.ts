@@ -2,7 +2,7 @@
 'use server';
 import 'dotenv/config';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { adminDb } from '@/lib/firebase-admin';
 import type { UserComponent, MasterComponent, MaintenanceLog } from '@/lib/types';
 
 
@@ -54,7 +54,6 @@ export async function replaceUserComponentAction({
         throw new Error("Either a selected component or manual component data must be provided.");
     }
     
-    const adminDb = await getAdminDb();
     const batch = adminDb.batch();
     
     try {
