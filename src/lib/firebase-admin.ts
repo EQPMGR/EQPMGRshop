@@ -8,11 +8,7 @@ export async function getAdminDb() {
   if (!admin.apps.length) {
     const secrets = await getFirebaseSecrets();
     admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: secrets.projectId,
-        clientEmail: secrets.clientEmail,
-        privateKey: secrets.privateKey,
-      }),
+      credential: admin.credential.cert(secrets),
     });
   }
 
