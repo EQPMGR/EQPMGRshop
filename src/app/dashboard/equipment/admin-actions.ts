@@ -86,7 +86,7 @@ export async function replaceUserComponentAction({
         if (newMasterComponentId) {
             finalNewMasterComponentId = newMasterComponentId;
             const newMasterCompDoc = await adminDb.doc(`masterComponents/${finalNewMasterComponentId}`).get();
-            if (!newMasterCompDoc.exists()) {
+            if (!newMasterCompDoc.exists) {
                 throw new Error("Selected replacement component not found in database.");
             }
             const masterData = newMasterCompDoc.data() as MasterComponent
