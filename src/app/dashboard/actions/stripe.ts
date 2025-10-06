@@ -1,15 +1,14 @@
 'use server';
 
 import { headers } from 'next/headers';
-import { auth } from '@clerk/nextjs/server';
 import Stripe from 'stripe';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb as getAdminDb } from '@/lib/firebase-admin';
 import { getStripeSecretKey, getStripePriceId } from '@/lib/secrets';
 
-export async function createPortalSession(): Promise<{ url: string | null }> {
-    const { userId } = auth();
+export async function createPortalSession(userId: string): Promise<{ url: string | null }> {
     const headersList = headers();
     const origin = headersList.get('origin') || 'http://localhost:3000';
+    const adminDb = await getAdminDb();
 
     if (!userId) {
         throw new Error("User must be authenticated to manage billing.");

@@ -137,9 +137,13 @@ export default function SettingsPage() {
     };
 
     const handleManageBilling = async () => {
+        if (!user) {
+            toast({ title: "Error", description: "You must be logged in.", variant: 'destructive'});
+            return;
+        }
         setBillingLoading(true);
         try {
-            const { url } = await createPortalSession();
+            const { url } = await createPortalSession(user.uid);
             if (url) {
                 window.location.href = url;
             } else {
