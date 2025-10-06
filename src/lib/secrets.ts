@@ -51,3 +51,11 @@ export async function getFirebaseSecrets() {
 export async function getGeminiApiKey() {
     return accessSecretVersion('GEMINI_API_KEY');
 }
+
+export async function getStripeSecretKey() {
+    return accessSecretVersion('STRIPE_SECRET_KEY');
+}
+
+export async function getStripePriceId() {
+    return accessSecretVersion('NEXT_PUBLIC_STRIPE_PRICE_ID');
+}

@@ -16,6 +16,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import { getGeohash } from "@/ai/flows/geocode-flow";
 import { Loader2, UploadCloud } from "lucide-react";
+import { createPortalSession } from "../actions/stripe";
 
 export default function SettingsPage() {
     const { user } = useAuth();
@@ -35,6 +36,7 @@ export default function SettingsPage() {
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [billingLoading, setBillingLoading] = useState(false);
     const [selectedCountry, setSelectedCountry] = useState<string>('');
     const states = getStates(selectedCountry);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -133,6 +135,22 @@ export default function SettingsPage() {
             setSaving(false);
         }
     };
+
+    const handleManageBilling = async () => {
+        setBillingLoading(true);
+        try {
+            const { url } = await createPortalSession();
+            if (url) {
+                window.location.href = url;
+            } else {
+                toast({ title: "Error", description: "Could not create billing session. Please try again.", variant: 'destructive' });
+            }
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "An unexpected error occurred.", variant: 'destructive' });
+        } finally {
+            setBillingLoading(false);
+        }
+    }
 
     if (loading) {
         return (
@@ -260,8 +278,9 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
             <div className="rounded-lg border border-border p-4 text-center">
-                <p className="text-muted-foreground">Stripe integration coming soon!</p>
-                <p className="text-sm text-muted-foreground">You will be able to manage your billing and subscription here.</p>
+                 <Button onClick={handleManageBilling} disabled={billingLoading}>
+                    {billingLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Manage Billing'}
+                </Button>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="promo-code">Promo Code</Label>
