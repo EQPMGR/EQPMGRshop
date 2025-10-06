@@ -8,7 +8,7 @@ import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 const client = new SecretManagerServiceClient();
 
 async function accessSecretVersion(secretName: string): Promise<string> {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const projectId = process.env.FIREBASE_PROJECT_ID || 'eqpmgr-test';
   
   if (!projectId) {
       throw new Error("GCP Project ID (FIREBASE_PROJECT_ID) is not defined. Ensure it's set in your environment or apphosting.yaml.");
@@ -34,7 +34,7 @@ export async function getFirebaseSecrets() {
     // These are now fetched from runtime environment variables, not directly from Secret Manager API
     const privateKey = process.env.FIREBASE_PRIVATE_KEY;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const projectId = process.env.FIREBASE_PROJECT_ID || 'eqpmgr-test';
 
     if (!privateKey || !clientEmail || !projectId) {
         throw new Error("One or more Firebase Admin secrets are missing from the environment.");
