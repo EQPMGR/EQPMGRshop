@@ -36,13 +36,6 @@ export default function DashboardPage() {
   const [openWorkOrdersCount, setOpenWorkOrdersCount] = useState(0);
   const [teamMembersCount, setTeamMembersCount] = useState(0);
 
-  const stats = [
-    { title: "Open Work Orders", value: openWorkOrdersCount.toString(), icon: Wrench, color: "text-accent" },
-    { title: "Completed This Month", value: "47", icon: CheckCircle, color: "text-green-500" },
-    { title: "Revenue (MTD)", value: "$8,230", icon: DollarSign, color: "text-blue-500" },
-    { title: "Team Members", value: teamMembersCount.toString(), icon: Users, color: "text-purple-500" },
-  ];
-
   useEffect(() => {
     if (!user) return;
 
@@ -225,20 +218,6 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-              <stat.icon className={`h-5 w-5 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              {/* <p className="text-xs text-muted-foreground">+2 from last month</p> */}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4">
             <CardHeader>
