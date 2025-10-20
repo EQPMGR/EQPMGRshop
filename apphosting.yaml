@@ -1,69 +1,87 @@
-# Settings to manage and configure a Firebase App Hosting backend.
-# https://firebase.google.com/docs/app-hosting/configure
-
+# Settings for Cloud Run (your backend instance)
 runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
-  maxInstances: 1
+  cpu: 1
+  memoryMiB: 1024
+  ingress: ALL
 
-# Environment variables and secrets for your runtime
+# Environment variables and secrets for your runtime.
+# Secrets MUST use the full resource path (projects/SOURCE_PROJECT_ID/secrets/SECRET_NAME) 
+# because they live in a different project (eqpmgr-test).
 env:
-  - variable: GEMINI_API_KEY
-    secret: GEMINI_API_KEY
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: STRIPE_SECRET_KEY
-    secret: STRIPE_SECRET_KEY
+  # === EMAIL SECRETS ===
+  - variable: EMAIL_HOST
+    secret: projects/eqpmgr-test/secrets/EMAIL_HOST
     availability:
       - RUNTIME
-  - variable: NEXT_PUBLIC_STRIPE_PRICE_ID
-    secret: NEXT_PUBLIC_STRIPE_PRICE_ID
+  - variable: EMAIL_PASS
+    secret: projects/eqpmgr-test/secrets/EMAIL_PASS
     availability:
       - RUNTIME
+  - variable: EMAIL_USER
+    secret: projects/eqpmgr-test/secrets/EMAIL_USER
+    availability:
+      - RUNTIME
+
+  # === FIREBASE CLIENT SECRETS (NEXT_PUBLIC_) ===
+  # Note: API_KEY is repeated for clarity, mapping to the same underlying secret.
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    secret: FIREBASE_API_KEY
+    secret: projects/eqpmgr-test/secrets/FIREBASE_API_KEY
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: "eqpmgr-test"
+    secret: projects/eqpmgr-test/secrets/FIREBASE_PROJECT_ID
     availability:
       - BUILD
       - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "eqpmgr-test.appspot.com"
+      
+  # Required to ensure the plain secret name FIREBASE_API_KEY is also available 
+  # for non-public (server-side) Firebase config loading.
+  - variable: FIREBASE_API_KEY
+    secret: projects/eqpmgr-test/secrets/FIREBASE_API_KEY
     availability:
       - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    secret: FIREBASE_MESSAGING_SENDER_ID
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    secret: FIREBASE_APP_ID
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: FIREBASE_PRIVATE_KEY
-    secret: FIREBASE_PRIVATE_KEY
-    availability:
-      - RUNTIME
-  - variable: FIREBASE_CLIENT_EMAIL
-    secret: FIREBASE_CLIENT_EMAIL
-    availability:
       - RUNTIME
   - variable: FIREBASE_PROJECT_ID
-    value: "eqpmgr-test"
+    secret: projects/eqpmgr-test/secrets/FIREBASE_PROJECT_ID
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # === FIREBASE ADMIN SDK / SERVER CONFIG SECRETS ===
+  - variable: FIREBASE_CLIENT_EMAIL
+    secret: projects/eqpmgr-test/secrets/FIREBASE_CLIENT_EMAIL
+    availability:
+      - RUNTIME
+  - variable: FIREBASE_PRIVATE_KEY
+    secret: projects/eqpmgr-test/secrets/FIREBASE_PRIVATE_KEY
+    availability:
+      - RUNTIME
+  - variable: FIREBASE_CONFIG
+    secret: projects/eqpmgr-test/secrets/FIREBASE_CONFIG
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # === OTHER API KEYS ===
+  - variable: GEMINI_API_KEY
+    secret: projects/eqpmgr-test/secrets/GEMINI_API_KEY
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # === STRIPE SECRETS ===
+  - variable: NEXT_PUBLIC_STRIPE_PRICE_ID
+    secret: projects/eqpmgr-test/secrets/NEXT_PUBLIC_STRIPE_PRICE_ID
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: STRIPE_SECRET_KEY
+    secret: projects/eqpmgr-test/secrets/STRIPE_SECRET_KEY
     availability:
       - RUNTIME
 
-# Next.js requires build-time access to public environment variables.
-# This passes the secrets to the 'next build' command.
-build:
-  args:
-    NEXT_PUBLIC_FIREBASE_API_KEY: ${secret:FIREBASE_API_KEY}
-    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${secret:FIREBASE_MESSAGING_SENDER_ID}
-    NEXT_PUBLIC_FIREBASE_APP_ID: ${secret:FIREBASE_APP_ID}
-    NEXT_PUBLIC_STRIPE_PRICE_ID: ${secret:NEXT_PUBLIC_STRIPE_PRICE_ID}
+# Arguments to pass to a build command (ensures consistency)
+buildArgs:
+  NEXT_PUBLIC_FIREBASE_API_KEY: ${secret:projects/eqpmgr-test/secrets/FIREBASE_API_KEY}
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${secret:projects/eqpmgr-test/secrets/FIREBASE_PROJECT_ID}
