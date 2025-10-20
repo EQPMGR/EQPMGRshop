@@ -111,9 +111,15 @@ export default function SettingsPage() {
             const fullAddress = `${shopData.streetAddress}, ${shopData.city}, ${shopData.state}, ${shopData.country}, ${shopData.postalCode}`;
             const geoData = await getGeohash(fullAddress);
 
+            let websiteUrl = shopData.website;
+            if (websiteUrl && !websiteUrl.startsWith('http://') && !websiteUrl.startsWith('https://')) {
+                websiteUrl = `https://${websiteUrl}`;
+            }
+
             const updatedData = {
                 ...shopData,
                 logoUrl,
+                website: websiteUrl,
                 address: fullAddress,
                 geohash: geoData.geohash,
                 lat: geoData.lat,
@@ -263,7 +269,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-2">
                 <Label htmlFor="website">Website</Label>
-                <Input id="website" type="url" placeholder="https://mybikeshop.com" value={shopData.website} onChange={handleInputChange}/>
+                <Input id="website" type="text" placeholder="mybikeshop.com" value={shopData.website} onChange={handleInputChange}/>
                 </div>
             </div>
             <div className="flex justify-end pt-4">

@@ -1,13 +1,12 @@
+
 'use server';
 
-import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { adminDb as getAdminDb } from '@/lib/firebase-admin';
 import { getStripeSecretKey, getStripePriceId } from '@/lib/secrets';
 
 export async function createPortalSession(userId: string): Promise<{ url: string | null }> {
-    const headersList = headers();
-    const origin = headersList.get('origin') || 'http://localhost:3000';
+    const origin = 'https://eqpmgrshop--eqpmgrshop-central.us-central1.hosted.app';
     const adminDb = await getAdminDb();
 
     if (!userId) {

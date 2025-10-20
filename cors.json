@@ -1,0 +1,9 @@
+
+[
+  {
+    "origin": ["https://eqpmgrshop--eqpmgrshop-central.us-central1.hosted.app", "http://localhost:3000", "http://localhost:9002"],
+    "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Authorization"],
+    "maxAgeSeconds": 3600
+  }
+]
