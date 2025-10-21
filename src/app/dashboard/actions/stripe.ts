@@ -7,16 +7,26 @@ import { getStripeSecretKey, getStripePriceId } from '@/lib/secrets';
 
 export async function createPortalSession(userId: string): Promise<{ url: string | null }> {
     const origin = 'https://eqpmgrshop--eqpmgrshop-central.us-central1.hosted.app';
+    let stripeSecretKey: string;
+    let priceId: string;
+
+    try {
+        stripeSecretKey = await getStripeSecretKey();
+        if (!stripeSecretKey) throw new Error("Stripe secret key is empty.");
+    } catch (error) {
+        console.error("Failed to retrieve Stripe secret key:", error);
+        throw new Error("Could not retrieve Stripe configuration. Check server logs and secret permissions.");
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2024-06-20',
+    });
+    
     const adminDb = await getAdminDb();
 
     if (!userId) {
         throw new Error("User must be authenticated to manage billing.");
     }
-
-    const stripeSecretKey = await getStripeSecretKey();
-    const stripe = new Stripe(stripeSecretKey, {
-        apiVersion: '2024-06-20',
-    });
 
     const serviceProviderRef = adminDb.doc(`serviceProviders/${userId}`);
     
@@ -47,10 +57,12 @@ export async function createPortalSession(userId: string): Promise<{ url: string
             // Save the new customer ID to the service provider document
             await serviceProviderRef.update({ stripeCustomerId: customerId });
 
-            // Also, let's create a subscription for the metered billing plan
-            const priceId = await getStripePriceId();
-            if (!priceId) {
-                throw new Error("Stripe Price ID is not configured.");
+            try {
+                priceId = await getStripePriceId();
+                if (!priceId) throw new Error("Stripe Price ID is empty.");
+            } catch (error) {
+                 console.error("Failed to retrieve Stripe Price ID:", error);
+                 throw new Error("Could not retrieve Stripe Price ID. Check server logs and secret permissions.");
             }
             
             await stripe.subscriptions.create({
@@ -71,6 +83,10 @@ export async function createPortalSession(userId: string): Promise<{ url: string
 
     } catch (error: any) {
         console.error("Error creating Stripe portal session:", error);
+        // Avoid leaking detailed Stripe-js errors to the client
+        if (error.type?.startsWith('Stripe')) {
+             throw new Error('An error occurred while communicating with Stripe. Please try again.');
+        }
         throw new Error(error.message || "An unexpected error occurred with Stripe.");
     }
 }
