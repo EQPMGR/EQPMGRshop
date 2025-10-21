@@ -24,7 +24,7 @@ env:
 
   # === FIREBASE CLIENT CONFIG (Client MUST connect to eqpmgr-test project) ===
   # All NEXT_PUBLIC variables must now use the public configuration of 'eqpmgr-test'
-  # to ensure the client SDK can find the database and storage bucket.
+  # to ensure the client SDK can find the database and storage buckets.
   
   # API Key is sensitive; sourced from secret
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
