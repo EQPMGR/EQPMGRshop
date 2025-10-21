@@ -45,7 +45,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: eqpmgr-test.appspot.com # <-- CHANGED
+    value: eqpmgr-test.firebasestorage.app # <-- CHANGED
     availability:
       - BUILD
       - RUNTIME
@@ -110,4 +110,4 @@ buildArgs:
   NEXT_PUBLIC_FIREBASE_API_KEY: ${secret:projects/eqpmgr-test/secrets/FIREBASE_API_KEY}
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: eqpmgr-test # <-- CHANGED
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: eqpmgr-test.firebaseapp.com # <-- CHANGED
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: eqpmgr-test.appspot.com # <-- CHANGED
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: eqpmgr-test.firebasestorage.app # <-- CHANGED

@@ -8,7 +8,7 @@ const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: "eqpmgr-test.firebaseapp.com",
   projectId: "eqpmgr-test",
-  storageBucket: "eqpmgr-test.appspot.com",
+  storageBucket: "eqpmgr-test.firebasestorage.app",
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
