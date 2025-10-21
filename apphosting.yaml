@@ -102,10 +102,7 @@ env:
     secret: projects/eqpmgr-test/secrets/STRIPE_SECRET_KEY
     availability:
       - RUNTIME
-  - variable: STRIPE_WEBHOOK_SECRET
-    secret: projects/eqpmgr-test/secrets/STRIPE_WEBHOOK_SECRET
-    availability:
-      - RUNTIME
+  # REMOVED: STRIPE_WEBHOOK_SECRET - Removed as it does not exist in your secret list.
 
 # Arguments to pass to a build command (ensures consistency)
 # These now explicitly reflect the correct data project (eqpmgr-test) configuration.
