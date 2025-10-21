@@ -90,12 +90,7 @@ env:
     availability:
       - BUILD
       - RUNTIME
-  - variable: NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY
-    # Assuming this should be treated as a secret if used
-    secret: projects/eqpmgr-test/secrets/GOOGLE_GEOCODING_API_KEY
-    availability:
-      - BUILD
-      - RUNTIME
+  # REMOVED: NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY due to missing secret/permission error.
 
   # === STRIPE SECRETS (Source: eqpmgr-test) ===
   - variable: NEXT_PUBLIC_STRIPE_PRICE_ID
