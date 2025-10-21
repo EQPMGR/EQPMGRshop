@@ -8,7 +8,7 @@ runConfig:
 # Secrets MUST use the full resource path (projects/SOURCE_PROJECT_ID/secrets/SECRET_NAME) 
 # because they live in a different project (eqpmgr-test).
 env:
-  # === EMAIL SECRETS ===
+  # === EMAIL SECRETS (Source: eqpmgr-test) ===
   - variable: EMAIL_HOST
     secret: projects/eqpmgr-test/secrets/EMAIL_HOST
     availability:
@@ -22,21 +22,42 @@ env:
     availability:
       - RUNTIME
 
-  # === FIREBASE CLIENT SECRETS (NEXT_PUBLIC_) ===
-  # Note: API_KEY is repeated for clarity, mapping to the same underlying secret.
+  # === FIREBASE CLIENT CONFIG (Client MUST connect to eqpmgr-test project) ===
+  # All NEXT_PUBLIC variables must now use the public configuration of 'eqpmgr-test'
+  # to ensure the client SDK can find the database and storage bucket.
+  
+  # API Key is sensitive; sourced from secret
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     secret: projects/eqpmgr-test/secrets/FIREBASE_API_KEY
     availability:
       - BUILD
       - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    secret: projects/eqpmgr-test/secrets/FIREBASE_PROJECT_ID
+      
+  # CHANGED: These public IDs must now point to the correct data project (eqpmgr-test).
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: eqpmgr-test.firebaseapp.com # <-- CHANGED
     availability:
       - BUILD
       - RUNTIME
-      
-  # Required to ensure the plain secret name FIREBASE_API_KEY is also available 
-  # for non-public (server-side) Firebase config loading.
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: eqpmgr-test # <-- CHANGED
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: eqpmgr-test.appspot.com # <-- CHANGED
+    availability:
+      - BUILD
+      - RUNTIME
+  # UPDATED: App ID set to the value provided by you (from eqpmgrshop-central project).
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:195502058575:web:76582395d477eedb5d0e3a
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Required for non-public (server-side) Firebase admin/config loading.
+  # These correctly point to the secrets project (eqpmgr-test).
   - variable: FIREBASE_API_KEY
     secret: projects/eqpmgr-test/secrets/FIREBASE_API_KEY
     availability:
@@ -48,7 +69,7 @@ env:
       - BUILD
       - RUNTIME
 
-  # === FIREBASE ADMIN SDK / SERVER CONFIG SECRETS ===
+  # === FIREBASE ADMIN SDK / SERVER CONFIG SECRETS (Source: eqpmgr-test) ===
   - variable: FIREBASE_CLIENT_EMAIL
     secret: projects/eqpmgr-test/secrets/FIREBASE_CLIENT_EMAIL
     availability:
@@ -63,14 +84,20 @@ env:
       - BUILD
       - RUNTIME
 
-  # === OTHER API KEYS ===
+  # === OTHER API KEYS (Source: eqpmgr-test) ===
   - variable: GEMINI_API_KEY
     secret: projects/eqpmgr-test/secrets/GEMINI_API_KEY
     availability:
       - BUILD
       - RUNTIME
+  - variable: NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY
+    # Assuming this should be treated as a secret if used
+    secret: projects/eqpmgr-test/secrets/GOOGLE_GEOCODING_API_KEY
+    availability:
+      - BUILD
+      - RUNTIME
 
-  # === STRIPE SECRETS ===
+  # === STRIPE SECRETS (Source: eqpmgr-test) ===
   - variable: NEXT_PUBLIC_STRIPE_PRICE_ID
     secret: projects/eqpmgr-test/secrets/NEXT_PUBLIC_STRIPE_PRICE_ID
     availability:
@@ -80,8 +107,15 @@ env:
     secret: projects/eqpmgr-test/secrets/STRIPE_SECRET_KEY
     availability:
       - RUNTIME
+  - variable: STRIPE_WEBHOOK_SECRET
+    secret: projects/eqpmgr-test/secrets/STRIPE_WEBHOOK_SECRET
+    availability:
+      - RUNTIME
 
 # Arguments to pass to a build command (ensures consistency)
+# These now explicitly reflect the correct data project (eqpmgr-test) configuration.
 buildArgs:
   NEXT_PUBLIC_FIREBASE_API_KEY: ${secret:projects/eqpmgr-test/secrets/FIREBASE_API_KEY}
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${secret:projects/eqpmgr-test/secrets/FIREBASE_PROJECT_ID}
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: eqpmgr-test # <-- CHANGED
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: eqpmgr-test.firebaseapp.com # <-- CHANGED
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: eqpmgr-test.appspot.com # <-- CHANGED
