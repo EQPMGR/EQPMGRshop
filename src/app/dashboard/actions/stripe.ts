@@ -6,7 +6,7 @@ import { adminDb as getAdminDb } from '@/lib/firebase-admin';
 import { getStripeSecretKey, getStripePriceId } from '@/lib/secrets';
 
 export async function createPortalSession(userId: string): Promise<{ url: string | null }> {
-    const origin = 'https://eqpmgrshop--eqpmgrshop-central.us-central1.hosted.app';
+    const origin = 'https://shop.eqpmgr.com';
     let stripeSecretKey: string;
     let priceId: string;
 
