@@ -11,11 +11,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, Loader2 } from "lucide-react";
+import { Wrench, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
 import { WorkOrder, WorkOrderStatus, allStatuses, statusVariant } from '@/app/dashboard/work-orders/page';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { WorkOrderDetailSheet } from '@/components/work-order-detail-sheet';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 type Availability = "Today" | "2-3 Day Wait" | "One Week Wait" | "Not Taking Orders";
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const [valetService, setValetService] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasStripeId, setHasStripeId] = useState(false);
   
   const [recentWorkOrders, setRecentWorkOrders] = useState<WorkOrder[]>([]);
   const [workOrdersLoading, setWorkOrdersLoading] = useState(true);
@@ -48,6 +50,7 @@ export default function DashboardPage() {
           setAvailability(data.availability || 'Today');
           setDropOff(data.dropOff || false);
           setValetService(data.valetService || false);
+          setHasStripeId(!!data.stripeCustomerId);
         }
         setLoading(false);
     };
@@ -59,11 +62,9 @@ export default function DashboardPage() {
 
     setWorkOrdersLoading(true);
     
-    // This query fetches the 5 most recent for the list display.
     const recentWorkOrdersQuery = query(
         collection(db, "workOrders"), 
         where("serviceProviderId", "==", user.uid),
-        // orderBy("createdAt", "desc"), // This causes an index error. We will sort on the client.
         limit(5)
     );
     
@@ -94,7 +95,6 @@ export default function DashboardPage() {
           equipmentId: data.equipmentId || '',
         });
       });
-      // Sort client-side to avoid index requirement
       const sortedOrders = orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setRecentWorkOrders(sortedOrders);
       setWorkOrdersLoading(false);
@@ -138,7 +138,27 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-headline font-bold text-primary">Dashboard</h1>
+        <div className="flex justify-between items-start">
+            <h1 className="text-3xl font-headline font-bold text-primary">Dashboard</h1>
+             {loading ? <Skeleton className="h-6 w-32" /> : (
+                hasStripeId ? (
+                <div className="flex items-center gap-2 text-sm text-green-400">
+                    <ShieldCheck className="h-5 w-5" />
+                    <span>Billing Active</span>
+                </div>
+            ) : null
+            )}
+        </div>
+
+      {!loading && !hasStripeId && (
+        <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Action Required: Complete Billing Setup</AlertTitle>
+            <AlertDescription>
+                Your shop is not yet active. Please go to <Link href="/dashboard/settings" className="font-semibold underline hover:text-white">Settings</Link> to set up your payment method via Stripe. You will not be able to receive work orders until this is complete.
+            </AlertDescription>
+        </Alert>
+      )}
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         
