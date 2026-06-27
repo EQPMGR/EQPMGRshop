@@ -12,13 +12,13 @@ import {
   SheetDescription,
   SheetFooter,
 } from '@/components/ui/sheet';
-import type { WorkOrder, WorkOrderStatus } from '@/app/dashboard/work-orders/page';
+import type { WorkOrder, WorkOrderStatus } from '@/lib/types';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { BikeFitDialog } from './bike-fit-dialog';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from '@/lib/firestore-compat';
 import { db } from '@/lib/firebase';
 import type { Equipment } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
@@ -45,7 +45,7 @@ export function WorkOrderDetailSheet({
         try {
           const equipmentDocRef = doc(db, 'users', workOrder.userId, 'equipment', workOrder.equipmentId);
           const docSnap = await getDoc(equipmentDocRef);
-          if (docSnap.exists()) {
+          if (docSnap.exists) {
             setEquipment({ id: docSnap.id, ...docSnap.data() } as Equipment);
           } else {
             toast({

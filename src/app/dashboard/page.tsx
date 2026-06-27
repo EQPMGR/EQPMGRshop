@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, collection, query, where, onSnapshot, DocumentData, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, onSnapshot, DocumentData, orderBy, limit } from '@/lib/firestore-compat';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Wrench, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
-import { WorkOrder, WorkOrderStatus, allStatuses, statusVariant } from '@/app/dashboard/work-orders/page';
+import { WorkOrder, WorkOrderStatus, allStatuses, statusVariant } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { WorkOrderDetailSheet } from '@/components/work-order-detail-sheet';
@@ -46,7 +46,7 @@ export default function DashboardPage() {
         setLoading(true);
         const serviceProviderRef = doc(db, "serviceProviders", user.uid);
         const docSnap = await getDoc(serviceProviderRef);
-        if (docSnap.exists()) {
+        if (docSnap.exists) {
           const data = docSnap.data();
           setAvailability(data.availability || 'Today');
           setDropOff(data.dropOff || false);

@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from '@/lib/firestore-compat';
 import { ChevronLeft, ArrowUpRight } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
@@ -39,7 +39,7 @@ export default function SystemDetailPage() {
       const equipmentDocRef = doc(db, 'users', uid, 'equipment', equipmentId);
       const equipmentDocSnap = await getDoc(equipmentDocRef);
 
-      if (equipmentDocSnap.exists()) {
+      if (equipmentDocSnap.exists) {
         const equipmentData = equipmentDocSnap.data();
         setEquipment({
           ...equipmentData,
@@ -70,10 +70,10 @@ export default function SystemDetailPage() {
           }
       }
 
-      const combinedComponents: Component[] = userComponents.map(userComp => {
+      const combinedComponents: Component[] = userComponents.flatMap(userComp => {
           const masterComp = masterComponentsMap.get(userComp.masterComponentId);
-          if (!masterComp) return null; 
-          return {
+          if (!masterComp) return [];
+          return [{
               ...userComp,
               componentName: masterComp.name,
               brand: masterComp.brand,
@@ -83,8 +83,8 @@ export default function SystemDetailPage() {
               id: userComp.id,
               purchaseDate: toDate(userComp.purchaseDate),
               lastServiceDate: toNullableDate(userComp.lastServiceDate),
-          };
-      }).filter((c): c is Component => c !== null); 
+          }];
+      });
       
       setComponents(combinedComponents);
 

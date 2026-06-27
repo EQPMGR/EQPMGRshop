@@ -14,9 +14,9 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, getDoc } from '@/lib/firestore-compat';
 import { db } from '@/lib/firebase';
-import { getGeohash } from '@/ai/flows/geocode-flow';
+import { encodeGeohash } from '@/lib/geohash';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { countries, getStates } from '@/lib/countries';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -107,9 +107,6 @@ export default function OnboardingPage() {
             .map(([key]) => key);
 
         try {
-            // 1. Get geohash for the address
-            const geoData = await getGeohash(fullAddress);
-
             const shopData = {
                 shopName: data.shopName,
                 address: fullAddress,
@@ -120,16 +117,37 @@ export default function OnboardingPage() {
                 postalCode: data.postalCode,
                 phone: data.phone,
                 services: selectedServices,
-                geohash: geoData.geohash,
-                lat: geoData.lat,
-                lng: geoData.lng,
+            };
+
+            let lat: number | undefined;
+            let lng: number | undefined;
+            let geohash: string | undefined;
+
+            if (data.streetAddress && data.city && data.state && data.country && data.postalCode) {
+                const response = await fetch('/api/geocode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ address: fullAddress }),
+                });
+
+                const geocodeResult = await response.json();
+                if (!response.ok) {
+                    throw new Error(geocodeResult.error || 'Geocoding failed.');
+                }
+
+                lat = geocodeResult.lat;
+                lng = geocodeResult.lng;
+                geohash = encodeGeohash(lat, lng);
             }
+
+            const locationData = lat !== undefined && lng !== undefined ? { lat, lng, ...(geohash ? { geohash } : {}) } : {};
 
             // 2. Update the user document
             const userRef = doc(db, "users", user.uid);
             await updateDoc(userRef, {
                 ...shopData,
-                onboardingComplete: true
+                onboardingComplete: true,
+                ...locationData,
             });
 
             // 3. Create a new document in serviceProviders
@@ -137,6 +155,7 @@ export default function OnboardingPage() {
             await setDoc(serviceProviderRef, {
                 ...shopData,
                 ownerId: user.uid,
+                ...locationData,
             });
 
             toast({
@@ -158,7 +177,7 @@ export default function OnboardingPage() {
         if (!authLoading && user) {
             const userDocRef = doc(db, "users", user.uid);
             getDoc(userDocRef).then(docSnap => {
-                if (docSnap.exists() && docSnap.data().onboardingComplete) {
+                if (docSnap.exists && docSnap.data().onboardingComplete) {
                     router.push('/dashboard');
                 }
             });

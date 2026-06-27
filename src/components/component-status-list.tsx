@@ -41,7 +41,7 @@ export function ComponentStatusList({ components }: ComponentStatusListProps) {
                         <p className="font-semibold">{component.brand} {component.model}</p>
                         <p>{(component.wearPercentage || 0).toFixed(1)}% wear</p>
                         <p>{(component.totalDistance || 0).toFixed(0)} km / {(component.totalHours || 0).toFixed(1)} hrs</p>
-                        <p>Purchased: {formatDate(component.purchaseDate)}</p>
+                        <p>Purchased: {formatDate(component.purchaseDate ?? undefined)}</p>
                         {component.lastServiceDate && <p>Last Service: {formatDate(component.lastServiceDate)}</p>}
                       </TooltipContent>
                   </Tooltip>

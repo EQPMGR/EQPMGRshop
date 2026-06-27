@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, Wrench, Loader2, Replace } from 'lucide-react';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc } from '@/lib/firestore-compat';
 
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
@@ -39,7 +39,7 @@ export default function ComponentDetailPage() {
       const equipmentDocRef = doc(db, 'users', uid, 'equipment', equipmentId);
       const equipmentDocSnap = await getDoc(equipmentDocRef);
 
-      if (!equipmentDocSnap.exists()) {
+      if (!equipmentDocSnap.exists) {
           toast({ variant: 'destructive', title: 'Equipment not found' });
           setIsLoading(false);
           return;
@@ -57,7 +57,7 @@ export default function ComponentDetailPage() {
       const mainComponentDocRef = doc(componentsCollectionRef, userComponentId);
       const mainComponentDocSnap = await getDoc(mainComponentDocRef);
 
-      if (!mainComponentDocSnap.exists()) {
+      if (!mainComponentDocSnap.exists) {
           toast({ variant: 'destructive', title: 'Component not found' });
           setIsLoading(false);
           return;
@@ -103,10 +103,10 @@ export default function ComponentDetailPage() {
         });
       }
 
-      const combinedSubComponents = subUserComps.map(subUserComp => {
+      const combinedSubComponents: Component[] = subUserComps.flatMap(subUserComp => {
         const masterComp = masterCompsMap.get(subUserComp.masterComponentId);
-        if (!masterComp) return null;
-        return {
+        if (!masterComp) return [];
+        return [{
           ...subUserComp,
           componentName: masterComp.name,
           brand: masterComp.brand,
@@ -116,8 +116,8 @@ export default function ComponentDetailPage() {
           id: subUserComp.id,
           purchaseDate: toDate(subUserComp.purchaseDate),
           lastServiceDate: toNullableDate(subUserComp.lastServiceDate),
-        };
-      }).filter((c): c is Component => c !== null);
+        }];
+      });
 
       setSubComponents(combinedSubComponents);
 
@@ -211,11 +211,11 @@ export default function ComponentDetailPage() {
                  <div><p className="text-muted-foreground">Size</p><p className="font-medium">N/A</p></div>
                 <div>
                     <p className="text-muted-foreground">Purchase Date</p>
-                    <p className="font-medium">{formatDate(component.purchaseDate)}</p>
+                    <p className="font-medium">{formatDate(component.purchaseDate ?? undefined)}</p>
                 </div>
                  <div>
                     <p className="text-muted-foreground">Last Service</p>
-                    <p className="font-medium">{formatDate(component.lastServiceDate)}</p>
+                    <p className="font-medium">{formatDate(component.lastServiceDate ?? undefined)}</p>
                 </div>
             </div>
 

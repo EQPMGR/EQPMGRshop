@@ -89,4 +89,59 @@ export interface BikeFitData {
     hasAeroBars?: boolean;
     cleatPosition?: CleatPosition;
 }
+
+export type WorkOrderStatus =
+  | "New"
+  | "Customer Contacted"
+  | "Appointment Booked"
+  | "Bike in Shop"
+  | "Awaiting Parts"
+  | "Awaiting Service"
+  | "In Service"
+  | "Testing"
+  | "Bike Ready"
+  | "Completed";
+
+export type WorkOrder = {
+  id: string;
+  customerName: string;
+  bike: string;
+  issueDescription: string;
+  createdAt: string;
+  status: WorkOrderStatus;
+  priority?: "Low" | "Medium" | "High";
+  priorityLoading?: boolean;
+  userEmail: string;
+  userPhone: string;
+  notes: string;
+  equipmentName: string;
+  userId: string;
+  equipmentId: string;
+};
+
+export const allStatuses: WorkOrderStatus[] = [
+  "New",
+  "Customer Contacted",
+  "Appointment Booked",
+  "Bike in Shop",
+  "Awaiting Parts",
+  "Awaiting Service",
+  "In Service",
+  "Testing",
+  "Bike Ready",
+  "Completed",
+];
+
+export const statusVariant: { [key in WorkOrderStatus]: "default" | "secondary" | "destructive" | "outline" } = {
+  "New": "default",
+  "Customer Contacted": "secondary",
+  "Appointment Booked": "secondary",
+  "Bike in Shop": "secondary",
+  "Awaiting Parts": "destructive",
+  "Awaiting Service": "secondary",
+  "In Service": "secondary",
+  "Testing": "secondary",
+  "Bike Ready": "outline",
+  "Completed": "outline",
+};
   

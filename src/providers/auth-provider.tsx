@@ -2,13 +2,21 @@
 'use client';
 
 import { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
+import type { User } from '@supabase/supabase-js';
+import { auth, db, getEmailRedirectUrl } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from '@/lib/firestore-compat';
+
+interface AppUser {
+  uid: string;
+  email: string | null;
+  emailVerified?: boolean;
+  displayName?: string | null;
+  photoURL?: string | null;
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: AppUser | null;
   loading: boolean;
   login: (email: string, pass: string) => Promise<any>;
   signup: (email: string, pass: string, name: string) => Promise<any>;
@@ -19,20 +27,27 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function toAppUser(user: User | null): AppUser | null {
+  if (!user) return null;
+  return {
+    uid: user.id,
+    email: user.email ?? null,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(false);
   const [shopName, setShopName] = useState<string | null>(null);
   const router = useRouter();
 
   const handleUserDocSnapshot = useCallback((docSnap: any) => {
-    if (docSnap.exists()) {
+    if (docSnap?.exists) {
       const data = docSnap.data();
       setOnboardingComplete(data.onboardingComplete || false);
       setShopName(data.shopName || null);
     } else {
-      // This case handles a new user that doesn't have a doc yet.
       setOnboardingComplete(false);
       setShopName(null);
     }
@@ -40,56 +55,126 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      if (user) {
-        setLoading(true);
-        const userDocRef = doc(db, "users", user.uid);
-        const unsubscribeFirestore = onSnapshot(userDocRef, handleUserDocSnapshot);
-        return () => unsubscribeFirestore(); // Cleanup Firestore listener
-      } else {
-        // No user, reset state
+    let unsubscribeAuth: (() => void) | null = null;
+    let unsubscribeFirestore: (() => void) | null = null;
+
+    const cleanupFirestore = () => {
+      if (unsubscribeFirestore) {
+        unsubscribeFirestore();
+        unsubscribeFirestore = null;
+      }
+    };
+
+    const handleAuthState = async (event: string, session: any) => {
+      cleanupFirestore();
+      const nextUser = toAppUser(session?.user ?? null);
+      setUser(nextUser);
+
+      if (!nextUser) {
+        setOnboardingComplete(false);
+        setShopName(null);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      const userDocRef = doc(db, 'users', nextUser.uid);
+
+      try {
+        const userDocSnap = await getDoc(userDocRef);
+        if (!userDocSnap.exists) {
+          await setDoc(db, userDocRef, {
+            email: nextUser.email,
+            createdAt: new Date(),
+            onboardingComplete: false,
+          });
+        }
+
+        unsubscribeFirestore = onSnapshot(db, userDocRef, handleUserDocSnapshot, (error) => {
+          console.warn('Firestore compatibility snapshot error:', error);
+          setLoading(false);
+        });
+      } catch (error: any) {
+        console.warn('AuthProvider user document load failed:', error);
         setOnboardingComplete(false);
         setShopName(null);
         setLoading(false);
       }
+    };
+
+    auth.getSession().then(({ data }) => {
+      handleAuthState('INITIAL_SESSION', data.session);
+    }).catch((error) => {
+      console.warn('Supabase getSession failed:', error);
+      setLoading(false);
     });
 
-    return () => unsubscribeAuth(); // Cleanup auth listener
+    const authStateChange = auth.onAuthStateChange((event, session) => {
+      handleAuthState(event, session);
+    });
+
+    if (authStateChange?.data?.subscription?.unsubscribe) {
+      unsubscribeAuth = authStateChange.data.subscription.unsubscribe;
+    }
+
+    return () => {
+      cleanupFirestore();
+      if (unsubscribeAuth) {
+        unsubscribeAuth();
+      }
+    };
   }, [handleUserDocSnapshot]);
 
-  const login = (email: string, pass: string) => {
-    return signInWithEmailAndPassword(auth, email, pass);
+  const login = async (email: string, pass: string) => {
+    const { error, data } = await auth.signInWithPassword({ email, password: pass });
+    if (error) {
+      throw error;
+    }
+    return data;
   };
 
   const signup = async (email: string, pass: string, shopName: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    const newUser = userCredential.user;
+    const { error, data } = await auth.signUp({
+      email,
+      password: pass,
+      options: {
+        emailRedirectTo: getEmailRedirectUrl(),
+      },
+    });
 
-    if (newUser) {
+    if (error) {
+      throw error;
+    }
+
+    const newUser = data.user;
+    if (newUser && data.session) {
       const userData = {
-        uid: newUser.uid,
-        email: newUser.email,
-        shopName: shopName,
+        email: newUser.email ?? null,
+        shopName,
         createdAt: new Date(),
-        onboardingComplete: false, // Explicitly set to false on signup
+        onboardingComplete: false,
       };
-      await setDoc(doc(db, "users", newUser.uid), userData);
-      
-      // Manually update local state after signup to prevent redirect loop
+      await setDoc(db, doc(db, 'users', newUser.id), userData);
+      await setDoc(db, doc(db, 'serviceProviders', newUser.id), {
+        ownerId: newUser.id,
+        shopName,
+      }, { merge: true });
       setOnboardingComplete(false);
       setShopName(shopName);
-
-      await sendEmailVerification(newUser);
+    } else if (newUser) {
+      setOnboardingComplete(false);
+      setShopName(shopName);
     }
-    
-    return userCredential;
+
+    return data;
   };
-  
-  const logout = () => {
-    signOut(auth).then(() => {
-      router.push('/');
-    });
+
+  const logout = async () => {
+    const { error } = await auth.signOut();
+    if (error) {
+      console.warn('Supabase signOut error:', error);
+    }
+    router.push('/');
   };
 
   const value = {

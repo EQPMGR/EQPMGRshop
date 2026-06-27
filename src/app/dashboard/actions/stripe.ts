@@ -2,91 +2,81 @@
 'use server';
 
 import Stripe from 'stripe';
-import { adminDb as getAdminDb } from '@/lib/firebase-admin';
-import { getStripeSecretKey, getStripePriceId } from '@/lib/secrets';
+import { db } from '@/lib/firebase';
 
 export async function createPortalSession(userId: string): Promise<{ url: string | null }> {
     const origin = 'https://shop.eqpmgr.com';
-    let stripeSecretKey: string;
-    let priceId: string;
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || process.env.STRIPE_PRICE_ID;
 
-    try {
-        stripeSecretKey = await getStripeSecretKey();
-        if (!stripeSecretKey) throw new Error("Stripe secret key is empty.");
-    } catch (error) {
-        console.error("Failed to retrieve Stripe secret key:", error);
-        throw new Error("Could not retrieve Stripe configuration. Check server logs and secret permissions.");
+    if (!stripeSecretKey) {
+        throw new Error('Stripe secret key is not configured.');
+    }
+    if (!priceId) {
+        throw new Error('Stripe price ID is not configured.');
     }
 
     const stripe = new Stripe(stripeSecretKey, {
         apiVersion: '2024-06-20',
     });
-    
-    const adminDb = await getAdminDb();
 
     if (!userId) {
-        throw new Error("User must be authenticated to manage billing.");
+        throw new Error('User must be authenticated to manage billing.');
     }
 
-    const serviceProviderRef = adminDb.doc(`serviceProviders/${userId}`);
-    
-    try {
-        const serviceProviderSnap = await serviceProviderRef.get();
+    const { data: serviceProvider, error: spError } = await db
+        .from('service_providers')
+        .select('stripe_customer_id')
+        .eq('id', userId)
+        .single();
 
-        if (!serviceProviderSnap.exists) {
-            throw new Error("Service provider data not found.");
+    if (spError) {
+        console.error('Supabase service_providers query failed:', spError);
+        throw new Error('Failed to load service provider record.');
+    }
+
+    let customerId = serviceProvider?.stripe_customer_id;
+
+    if (!customerId) {
+        const { data: userData, error: userError } = await db
+            .from('app_users')
+            .select('email, shop_name')
+            .eq('id', userId)
+            .single();
+
+        if (userError) {
+            console.error('Supabase app_users query failed:', userError);
+            throw new Error('Failed to load user record.');
         }
 
-        let customerId = serviceProviderSnap.data()?.stripeCustomerId;
-
-        if (!customerId) {
-            // Customer doesn't exist, create a new one in Stripe
-            const userSnap = await adminDb.doc(`users/${userId}`).get();
-            const userData = userSnap.data();
-
-            const customer = await stripe.customers.create({
-                email: userData?.email,
-                name: userData?.shopName,
-                metadata: {
-                    firebaseUID: userId,
-                },
-            });
-            
-            customerId = customer.id;
-
-            // Save the new customer ID to the service provider document
-            await serviceProviderRef.update({ stripeCustomerId: customerId });
-
-            try {
-                priceId = await getStripePriceId();
-                if (!priceId) throw new Error("Stripe Price ID is empty.");
-            } catch (error) {
-                 console.error("Failed to retrieve Stripe Price ID:", error);
-                 throw new Error("Could not retrieve Stripe Price ID. Check server logs and secret permissions.");
-            }
-            
-            await stripe.subscriptions.create({
-                customer: customerId,
-                items: [{
-                    price: priceId,
-                }],
-            });
-        }
-        
-        // Create a billing portal session
-        const portalSession = await stripe.billingPortal.sessions.create({
-            customer: customerId,
-            return_url: `${origin}/dashboard/settings`,
+        const customer = await stripe.customers.create({
+            email: userData?.email,
+            name: userData?.shop_name,
+            metadata: {
+                userId,
+            },
         });
+        customerId = customer.id;
 
-        return { url: portalSession.url };
+        const { error: updateError } = await db
+            .from('service_providers')
+            .update({ stripe_customer_id: customerId })
+            .eq('id', userId);
 
-    } catch (error: any) {
-        console.error("Error creating Stripe portal session:", error);
-        // Avoid leaking detailed Stripe-js errors to the client
-        if (error.type?.startsWith('Stripe')) {
-             throw new Error('An error occurred while communicating with Stripe. Please try again.');
+        if (updateError) {
+            console.error('Failed to update service provider stripe_customer_id:', updateError);
         }
-        throw new Error(error.message || "An unexpected error occurred with Stripe.");
+
+        await stripe.subscriptions.create({
+            customer: customerId,
+            items: [{ price: priceId }],
+        });
     }
+
+    const portalSession = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: `${origin}/dashboard/settings`,
+    });
+
+    return { url: portalSession.url };
 }

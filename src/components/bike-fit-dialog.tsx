@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc } from '@/lib/firestore-compat';
 
 import { db } from '@/lib/firebase';
 import type { Equipment, BikeFitData, CleatPosition } from '@/lib/types';
@@ -141,14 +141,17 @@ export function BikeFitDialog({ children, equipment, userId, onSuccess }: BikeFi
      <FormField
         control={form.control}
         name={name}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>{letter}. {label} ({unit})</FormLabel>
-            <FormControl>
-              <Input type="number" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)} value={field.value ?? ''} />
-            </FormControl>
-          </FormItem>
-        )}
+        render={({ field }) => {
+          const value = typeof field.value === 'boolean' || typeof field.value === 'object' ? '' : field.value;
+          return (
+            <FormItem>
+              <FormLabel>{letter}. {label} ({unit})</FormLabel>
+              <FormControl>
+                <Input type="number" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)} value={value ?? ''} />
+              </FormControl>
+            </FormItem>
+          );
+        }}
       />
   );
   
@@ -156,14 +159,17 @@ export function BikeFitDialog({ children, equipment, userId, onSuccess }: BikeFi
      <FormField
         control={form.control}
         name={name}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>{letter}. {label}</FormLabel>
-            <FormControl>
-              <Input {...field} value={field.value ?? ''} />
-            </FormControl>
-          </FormItem>
-        )}
+        render={({ field }) => {
+          const textValue = typeof field.value === 'object' || typeof field.value === 'boolean' ? '' : field.value;
+          return (
+            <FormItem>
+              <FormLabel>{letter}. {label}</FormLabel>
+              <FormControl>
+                <Input {...field} value={textValue ?? ''} />
+              </FormControl>
+            </FormItem>
+          );
+        }}
       />
   );
   

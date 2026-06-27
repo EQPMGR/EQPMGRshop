@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, query, where } from '@/lib/firestore-compat';
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,7 @@ export default function EmployeesPage() {
         const q = query(collection(db, 'employees'), where('shopId', '==', user.uid));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedEmployees: Employee[] = [];
-            snapshot.forEach((doc) => {
+            snapshot.forEach((doc: any) => {
                 fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
             });
             setEmployees(fetchedEmployees);

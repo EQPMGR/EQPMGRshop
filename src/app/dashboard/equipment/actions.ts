@@ -1,9 +1,8 @@
 
 'use server';
 
-import { adminDb as getAdminDb } from '@/lib/firebase-admin';
-import type { UserComponent } from '@/lib/types';
-
+import { db } from '@/lib/firebase';
+import { doc, deleteDoc } from '@/lib/firestore-compat';
 
 export async function deleteUserComponentAction({
     userId,
@@ -14,20 +13,18 @@ export async function deleteUserComponentAction({
     equipmentId: string;
     userComponentId: string;
 }) {
-    const adminDb = await getAdminDb();
     if (!userId || !equipmentId || !userComponentId) {
-        throw new Error("Missing required parameters for component deletion.");
+        throw new Error('Missing required parameters for component deletion.');
     }
 
     try {
-        const componentRef = adminDb.doc(`users/${userId}/equipment/${equipmentId}/components/${userComponentId}`);
-        await componentRef.delete();
-        return { success: true, message: "Component deleted successfully." };
+        await deleteDoc(doc(db, 'users', userId, 'equipment', equipmentId, 'components', userComponentId));
+        return { success: true, message: 'Component deleted successfully.' };
 
     } catch(error) {
-        console.error("[SERVER ACTION ERROR] in deleteUserComponentAction:", error);
+        console.error('[SERVER ACTION ERROR] in deleteUserComponentAction:', error);
         if ((error as any).code === 'permission-denied' || (error as any).code === 7) {
-            throw new Error('A permission error occurred. This may be due to Firestore security rules.');
+            throw new Error('A permission error occurred. This may be due to access rules.');
         }
         throw new Error((error as Error).message || 'An unexpected error occurred.');
     }

@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,13 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { countries, getStates } from "@/lib/countries";
-import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
-import { db, storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { doc, getDoc, updateDoc, setDoc } from "@/lib/firestore-compat";
+import { db } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "@/lib/storage-compat";
+import { encodeGeohash } from '@/lib/geohash';
 import { useToast } from "@/hooks/use-toast";
-import { getGeohash } from "@/ai/flows/geocode-flow";
+
 import { Loader2, UploadCloud } from "lucide-react";
-import { createPortalSession } from "../actions/stripe";
+
 
 export default function SettingsPage() {
     const { user } = useAuth();
@@ -46,7 +46,7 @@ export default function SettingsPage() {
             if (user) {
                 const serviceProviderRef = doc(db, "serviceProviders", user.uid);
                 const docSnap = await getDoc(serviceProviderRef);
-                if (docSnap.exists()) {
+                if (docSnap.exists) {
                     const data = docSnap.data();
                     setShopData({
                         shopName: data.shopName || '',
@@ -103,28 +103,49 @@ export default function SettingsPage() {
         try {
             let logoUrl = shopData.logoUrl;
             if (logoFile) {
-                const storageRef = ref(storage, `logos/${user.uid}/${logoFile.name}`);
+                const safeFileName = logoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                const storageRef = ref(undefined, `logos/${user.uid}/${safeFileName}`);
                 await uploadBytes(storageRef, logoFile);
                 logoUrl = await getDownloadURL(storageRef);
             }
 
             const fullAddress = `${shopData.streetAddress}, ${shopData.city}, ${shopData.state}, ${shopData.country}, ${shopData.postalCode}`;
-            const geoData = await getGeohash(fullAddress);
 
             let websiteUrl = shopData.website;
             if (websiteUrl && !websiteUrl.startsWith('http://') && !websiteUrl.startsWith('https://')) {
                 websiteUrl = `https://${websiteUrl}`;
             }
 
+            let lat: number | undefined;
+            let lng: number | undefined;
+            let geohash: string | undefined;
+
+            if (shopData.streetAddress && shopData.city && shopData.state && shopData.country && shopData.postalCode) {
+                const response = await fetch('/api/geocode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ address: fullAddress }),
+                });
+
+                const geocodeResult = await response.json();
+                if (!response.ok) {
+                    throw new Error(geocodeResult.error || 'Geocoding failed.');
+                }
+
+                lat = geocodeResult.lat;
+                lng = geocodeResult.lng;
+                geohash = encodeGeohash(lat, lng);
+            }
+
+            const locationData = lat !== undefined && lng !== undefined ? { lat, lng, ...(geohash ? { geohash } : {}) } : {};
+
             const updatedData = {
                 ...shopData,
                 logoUrl,
                 website: websiteUrl,
                 address: fullAddress,
-                geohash: geoData.geohash,
-                lat: geoData.lat,
-                lng: geoData.lng,
                 ownerId: user.uid,
+                ...locationData,
             };
 
             const serviceProviderRef = doc(db, "serviceProviders", user.uid);
@@ -149,12 +170,20 @@ export default function SettingsPage() {
         }
         setBillingLoading(true);
         try {
-            const { url } = await createPortalSession(user.uid);
-            if (url) {
-                window.location.href = url;
-            } else {
-                toast({ title: "Error", description: "Could not create billing session. Please try again.", variant: 'destructive' });
+            const response = await fetch('/api/stripe-portal', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ userId: user.uid }),
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.url) {
+                throw new Error(data.error || 'Could not create billing session.');
             }
+
+            window.location.href = data.url;
         } catch (error: any) {
             toast({ title: "Error", description: error.message || "An unexpected error occurred.", variant: 'destructive' });
         } finally {
@@ -185,11 +214,11 @@ export default function SettingsPage() {
                 <Label>Shop Logo</Label>
                 <div className="flex items-center gap-4">
                      <div 
-                        className="relative h-24 w-24 rounded-md border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary"
+                        className="relative h-24 w-24 overflow-hidden rounded-md border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary"
                         onClick={() => fileInputRef.current?.click()}
                      >
                         {logoPreview ? (
-                            <Image src={logoPreview} alt="Logo Preview" layout="fill" className="rounded-md object-cover"/>
+                            <img src={logoPreview} alt="Logo Preview" className="h-full w-full rounded-md object-cover" />
                         ) : (
                             <div className="text-center text-muted-foreground">
                                 <UploadCloud className="mx-auto h-8 w-8"/>

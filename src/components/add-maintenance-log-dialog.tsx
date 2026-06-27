@@ -75,7 +75,10 @@ export function AddMaintenanceLogDialog({ onAddLog, children }: AddMaintenanceLo
   };
 
   function onSubmit(data: MaintenanceLogFormValues) {
-    onAddLog(data);
+    onAddLog({
+      ...data,
+      notes: data.notes ?? '',
+    });
     toast({
       title: 'Log Added!',
       description: 'The maintenance entry has been added.',

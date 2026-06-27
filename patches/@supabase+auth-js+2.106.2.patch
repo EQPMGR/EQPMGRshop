@@ -1,0 +1,58 @@
+diff --git a/node_modules/@supabase/auth-js/dist/main/lib/helpers.js b/node_modules/@supabase/auth-js/dist/main/lib/helpers.js
+index 27c0f72..c032f25 100644
+--- a/node_modules/@supabase/auth-js/dist/main/lib/helpers.js
++++ b/node_modules/@supabase/auth-js/dist/main/lib/helpers.js
+@@ -58,6 +58,12 @@ const supportsLocalStorage = () => {
+         if (typeof globalThis.localStorage !== 'object') {
+             return false;
+         }
++        if (typeof globalThis.localStorage.getItem !== 'function' ||
++            typeof globalThis.localStorage.setItem !== 'function' ||
++            typeof globalThis.localStorage.removeItem !== 'function' ||
++            typeof globalThis.localStorage.clear !== 'function') {
++            return false;
++        }
+     }
+     catch (e) {
+         // DOM exception when accessing `localStorage`
+diff --git a/node_modules/@supabase/auth-js/dist/main/lib/locks.js b/node_modules/@supabase/auth-js/dist/main/lib/locks.js
+index 02295d5..e9d5d5c 100644
+--- a/node_modules/@supabase/auth-js/dist/main/lib/locks.js
++++ b/node_modules/@supabase/auth-js/dist/main/lib/locks.js
+@@ -14,6 +14,7 @@ exports.internals = {
+     debug: !!(globalThis &&
+         (0, helpers_1.supportsLocalStorage)() &&
+         globalThis.localStorage &&
++        typeof globalThis.localStorage.getItem === 'function' &&
+         globalThis.localStorage.getItem('supabase.gotrue-js.locks.debug') === 'true'),
+ };
+ /**
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/helpers.js b/node_modules/@supabase/auth-js/dist/module/lib/helpers.js
+index 2e89925..405d0bb 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/helpers.js
++++ b/node_modules/@supabase/auth-js/dist/module/lib/helpers.js
+@@ -37,6 +37,12 @@ export const supportsLocalStorage = () => {
+         if (typeof globalThis.localStorage !== 'object') {
+             return false;
+         }
++        if (typeof globalThis.localStorage.getItem !== 'function' ||
++            typeof globalThis.localStorage.setItem !== 'function' ||
++            typeof globalThis.localStorage.removeItem !== 'function' ||
++            typeof globalThis.localStorage.clear !== 'function') {
++            return false;
++        }
+     }
+     catch (e) {
+         // DOM exception when accessing `localStorage`
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/locks.js b/node_modules/@supabase/auth-js/dist/module/lib/locks.js
+index 9fcad89..e19f424 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/locks.js
++++ b/node_modules/@supabase/auth-js/dist/module/lib/locks.js
+@@ -9,6 +9,7 @@ export const internals = {
+     debug: !!(globalThis &&
+         supportsLocalStorage() &&
+         globalThis.localStorage &&
++        typeof globalThis.localStorage.getItem === 'function' &&
+         globalThis.localStorage.getItem('supabase.gotrue-js.locks.debug') === 'true'),
+ };
+ /**

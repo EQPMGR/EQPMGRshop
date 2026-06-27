@@ -11,7 +11,7 @@ import {
   PlusCircle,
   Zap,
 } from 'lucide-react';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from '@/lib/firestore-compat';
 
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
@@ -99,7 +99,7 @@ export default function EquipmentDetailPage() {
       const equipmentDocRef = doc(db, 'users', uid, 'equipment', equipmentId);
       const equipmentDocSnap = await getDoc(equipmentDocRef);
 
-      if (equipmentDocSnap.exists()) {
+      if (equipmentDocSnap.exists) {
         const equipmentData = equipmentDocSnap.data();
 
         // Fetch components from the subcollection
@@ -123,13 +123,13 @@ export default function EquipmentDetailPage() {
             }
         }
 
-        const combinedComponents: Component[] = userComponents.map(userComp => {
+        const combinedComponents: Component[] = userComponents.flatMap(userComp => {
             const masterComp = masterComponentsMap.get(userComp.masterComponentId);
             if (!masterComp) {
                 console.warn(`Master component with ID ${userComp.masterComponentId} not found.`);
-                return null; 
+                return [];
             }
-            return {
+            return [{
                 ...userComp,
                 componentName: masterComp.name,
                 brand: masterComp.brand,
@@ -139,8 +139,8 @@ export default function EquipmentDetailPage() {
                 id: userComp.id, // Use the userComponent's ID for navigation and keys
                 purchaseDate: toDate(userComp.purchaseDate),
                 lastServiceDate: toNullableDate(userComp.lastServiceDate),
-            };
-        }).filter((c): c is Component => c !== null);
+            }];
+        });
 
         setEquipment({
             ...equipmentData,

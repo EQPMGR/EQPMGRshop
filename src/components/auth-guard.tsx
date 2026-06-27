@@ -35,8 +35,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
        return;
     }
 
-    // If email is verified but onboarding is not complete, redirect to onboarding page
-    if (user.emailVerified && !onboardingComplete && pathname !== '/onboarding') {
+    // If email is verified but onboarding is not complete, allow the user to access settings.
+    // Otherwise redirect to onboarding for routes other than /dashboard/settings.
+    if (user.emailVerified && !onboardingComplete && pathname !== '/onboarding' && pathname !== '/dashboard/settings') {
         router.push('/onboarding');
         return;
     }

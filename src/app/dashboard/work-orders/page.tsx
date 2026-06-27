@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, DocumentData, doc, updateDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, DocumentData, doc, updateDoc } from "@/lib/firestore-compat";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -30,63 +30,11 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { WorkOrderDetailSheet } from "@/components/work-order-detail-sheet";
 
-export type WorkOrderStatus =
-  | "New"
-  | "Customer Contacted"
-  | "Appointment Booked"
-  | "Bike in Shop"
-  | "Awaiting Parts"
-  | "Awaiting Service"
-  | "In Service"
-  | "Testing"
-  | "Bike Ready"
-  | "Completed";
-
-export type WorkOrder = {
-  id: string;
-  customerName: string;
-  bike: string;
-  issueDescription: string;
-  createdAt: string;
-  status: WorkOrderStatus;
-  priority?: "Low" | "Medium" | "High";
-  priorityLoading?: boolean;
-  userEmail: string;
-  userPhone: string;
-  notes: string;
-  equipmentName: string;
-  userId: string;
-  equipmentId: string;
-};
-
-export const allStatuses: WorkOrderStatus[] = [
-  "New",
-  "Customer Contacted",
-  "Appointment Booked",
-  "Bike in Shop",
-  "Awaiting Parts",
-  "Awaiting Service",
-  "In Service",
-  "Testing",
-  "Bike Ready",
-  "Completed",
-];
-
-export const statusVariant: { [key in WorkOrderStatus]: "default" | "secondary" | "destructive" | "outline" } = {
-  "New": "default",
-  "Customer Contacted": "secondary",
-  "Appointment Booked": "secondary",
-  "Bike in Shop": "secondary",
-  "Awaiting Parts": "destructive",
-  "Awaiting Service": "secondary",
-  "In Service": "secondary",
-  "Testing": "secondary",
-  "Bike Ready": "outline",
-  "Completed": "outline",
-};
+import type { WorkOrder, WorkOrderStatus } from '@/lib/types';
+import { allStatuses, statusVariant } from '@/lib/types';
 
 const priorityVariant: { [key in NonNullable<WorkOrder['priority']>]: "default" | "secondary" | "destructive" } = {
-  "Low": "outline",
+  "Low": "secondary",
   "Medium": "secondary",
   "High": "destructive"
 };
