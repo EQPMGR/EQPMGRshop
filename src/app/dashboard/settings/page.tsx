@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { countries, getStates } from "@/lib/countries";
 import { doc, getDoc, updateDoc, setDoc } from "@/lib/firestore-compat";
 import { db } from "@/lib/firebase";
@@ -17,6 +18,12 @@ import { useToast } from "@/hooks/use-toast";
 
 import { Loader2, UploadCloud } from "lucide-react";
 
+
+const serviceOptions = [
+  { id: 'repairs', label: 'Repair', value: 'repairs' },
+  { id: 'bikeFitting', label: 'Bike Fit', value: 'bike-fitting' },
+  { id: 'rental', label: 'Rental', value: 'rental' },
+] as const;
 
 export default function SettingsPage() {
     const { user } = useAuth();
@@ -31,6 +38,12 @@ export default function SettingsPage() {
         phone: '',
         website: '',
         logoUrl: '',
+        services: [] as string[],
+    });
+    const [serviceSelections, setServiceSelections] = useState({
+        repairs: false,
+        bikeFitting: false,
+        rental: false,
     });
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -48,6 +61,7 @@ export default function SettingsPage() {
                 const docSnap = await getDoc(serviceProviderRef);
                 if (docSnap.exists) {
                     const data = docSnap.data();
+                    const storedServices = Array.isArray(data.services) ? data.services : [];
                     setShopData({
                         shopName: data.shopName || '',
                         streetAddress: data.streetAddress || '',
@@ -58,6 +72,12 @@ export default function SettingsPage() {
                         phone: data.phone || '',
                         website: data.website || '',
                         logoUrl: data.logoUrl || '',
+                        services: storedServices,
+                    });
+                    setServiceSelections({
+                        repairs: storedServices.includes('repairs'),
+                        bikeFitting: storedServices.includes('bike-fitting'),
+                        rental: storedServices.includes('rental'),
                     });
                     setSelectedCountry(data.country || '');
                     if (data.logoUrl) {
@@ -134,10 +154,16 @@ export default function SettingsPage() {
 
                 lat = geocodeResult.lat;
                 lng = geocodeResult.lng;
-                geohash = encodeGeohash(lat, lng);
+                if (typeof lat === 'number' && typeof lng === 'number') {
+                    geohash = encodeGeohash(lat, lng);
+                }
             }
 
             const locationData = lat !== undefined && lng !== undefined ? { lat, lng, ...(geohash ? { geohash } : {}) } : {};
+
+            const selectedServices = serviceOptions
+                .filter((option) => serviceSelections[option.id])
+                .map((option) => option.value);
 
             const updatedData = {
                 ...shopData,
@@ -145,6 +171,7 @@ export default function SettingsPage() {
                 website: websiteUrl,
                 address: fullAddress,
                 ownerId: user.uid,
+                services: selectedServices,
                 ...locationData,
             };
 
@@ -299,6 +326,25 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                 <Label htmlFor="website">Website</Label>
                 <Input id="website" type="text" placeholder="mybikeshop.com" value={shopData.website} onChange={handleInputChange}/>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label>Services Offered</Label>
+                <div className="grid gap-3 md:grid-cols-3">
+                    {serviceOptions.map((option) => (
+                        <label key={option.id} className="flex items-center gap-2 rounded-lg border border-border p-3">
+                            <Checkbox
+                                id={option.id}
+                                checked={serviceSelections[option.id]}
+                                onCheckedChange={(checked) => setServiceSelections((prev) => ({
+                                    ...prev,
+                                    [option.id]: Boolean(checked),
+                                }))}
+                            />
+                            <span>{option.label}</span>
+                        </label>
+                    ))}
                 </div>
             </div>
             <div className="flex justify-end pt-4">

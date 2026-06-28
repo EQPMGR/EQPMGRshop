@@ -31,9 +31,9 @@ const onboardingSchema = z.object({
     phone: z.string().min(1, "Phone number is required"),
     services: z.object({
         repairs: z.boolean().default(false),
-        rentals: z.boolean().default(false),
-        fitting: z.boolean().default(false),
-    }).refine(data => data.repairs || data.rentals || data.fitting, {
+        rental: z.boolean().default(false),
+        bikeFitting: z.boolean().default(false),
+    }).refine(data => data.repairs || data.rental || data.bikeFitting, {
         message: "Please select at least one service.",
         path: ['repairs'], // Assign error to one of the checkboxes
     }),
@@ -43,8 +43,8 @@ type OnboardingFormValues = z.infer<typeof onboardingSchema>;
 
 const serviceOptions = [
     { id: 'repairs', label: 'Bicycle Repairs' },
-    { id: 'rentals', label: 'Bicycle Rental' },
-    { id: 'fitting', label: 'Bike Fit Services' },
+    { id: 'rental', label: 'Bicycle Rental' },
+    { id: 'bikeFitting', label: 'Bike Fit Services' },
 ] as const;
 
 
@@ -70,8 +70,8 @@ export default function OnboardingPage() {
             phone: '',
             services: {
                 repairs: false,
-                rentals: false,
-                fitting: false,
+                rental: false,
+                bikeFitting: false,
             },
         }
     });
@@ -104,7 +104,11 @@ export default function OnboardingPage() {
         
         const selectedServices = Object.entries(data.services)
             .filter(([, value]) => value)
-            .map(([key]) => key);
+            .map(([key]) => {
+                if (key === 'bikeFitting') return 'bike-fitting';
+                if (key === 'rental') return 'rental';
+                return key;
+            });
 
         try {
             const shopData = {
@@ -137,7 +141,9 @@ export default function OnboardingPage() {
 
                 lat = geocodeResult.lat;
                 lng = geocodeResult.lng;
-                geohash = encodeGeohash(lat, lng);
+                if (typeof lat === 'number' && typeof lng === 'number') {
+                    geohash = encodeGeohash(lat, lng);
+                }
             }
 
             const locationData = lat !== undefined && lng !== undefined ? { lat, lng, ...(geohash ? { geohash } : {}) } : {};
