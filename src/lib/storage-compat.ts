@@ -85,7 +85,7 @@ export async function uploadBytes(storageRef: StorageRef, file: File | Blob): Pr
 }
 
 export async function getDownloadURL(storageRef: StorageRef): Promise<string> {
-  const { data } = await auth.storage.from(STORAGE_BUCKET).getPublicUrl(storageRef.path);
+  const { data } = await supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(storageRef.path);
 
   if (!data?.publicUrl) {
     throw new Error('Failed to get download URL: no public URL returned.');
