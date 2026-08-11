@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, Wrench, Loader2, Replace } from 'lucide-react';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc } from '@/lib/firestore-compat';
 
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
@@ -36,42 +35,58 @@ export default function ComponentDetailPage() {
   const fetchComponentData = useCallback(async (uid: string, equipmentId: string, userComponentId: string) => {
     setIsLoading(true);
     try {
-      const equipmentDocRef = doc(db, 'users', uid, 'equipment', equipmentId);
-      const equipmentDocSnap = await getDoc(equipmentDocRef);
+      // Fetch equipment
+      const { data: equipmentData, error: equipmentError } = await db
+        .from('equipment')
+        .select('*')
+        .eq('id', equipmentId)
+        .eq('user_id', uid)
+        .single();
 
-      if (!equipmentDocSnap.exists) {
+      if (equipmentError || !equipmentData) {
           toast({ variant: 'destructive', title: 'Equipment not found' });
           setIsLoading(false);
           return;
       }
-      const eqData = equipmentDocSnap.data();
+
       setEquipment({ 
-          id: equipmentDocSnap.id, 
-          ...eqData,
-          purchaseDate: toDate(eqData.purchaseDate),
-          maintenanceLog: (eqData.maintenanceLog || []).map((l: any) => ({...l, date: toDate(l.date)})),
+          ...equipmentData,
+          purchaseDate: toDate(equipmentData.purchase_date),
+          maintenanceLog: (equipmentData.maintenance_log || []).map((l: any) => ({...l, date: toDate(l.date)})),
         } as Equipment);
 
-      const componentsCollectionRef = collection(db, 'users', uid, 'equipment', equipmentId, 'components');
-      
-      const mainComponentDocRef = doc(componentsCollectionRef, userComponentId);
-      const mainComponentDocSnap = await getDoc(mainComponentDocRef);
+      // Fetch main component
+      const { data: mainComponentData, error: mainComponentError } = await db
+        .from('components')
+        .select('*')
+        .eq('id', userComponentId)
+        .eq('equipment_id', equipmentId)
+        .eq('user_id', uid)
+        .single();
 
-      if (!mainComponentDocSnap.exists) {
+      if (mainComponentError || !mainComponentData) {
           toast({ variant: 'destructive', title: 'Component not found' });
           setIsLoading(false);
           return;
       }
 
-      const mainUserComp = { id: mainComponentDocSnap.id, ...mainComponentDocSnap.data() } as UserComponent;
+      const mainUserComp = mainComponentData as UserComponent;
 
-      const subComponentsQuery = query(componentsCollectionRef, where('parentUserComponentId', '==', userComponentId));
-      const subComponentsSnap = await getDocs(subComponentsQuery);
-      const subUserComps = subComponentsSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as UserComponent));
+      // Fetch sub-components
+      const { data: subComponentsData, error: subComponentsError } = await db
+        .from('components')
+        .select('*')
+        .eq('parent_user_component_id', userComponentId)
+        .eq('equipment_id', equipmentId)
+        .eq('user_id', uid);
+
+      if (subComponentsError) throw subComponentsError;
+
+      const subUserComps = (subComponentsData || []) as UserComponent[];
 
       const masterIdsToFetch = [
-        mainUserComp.masterComponentId,
-        ...subUserComps.map(sc => sc.masterComponentId)
+        mainUserComp.master_component_id,
+        ...subUserComps.map(sc => sc.master_component_id)
       ].filter(Boolean);
 
       const uniqueMasterIds = [...new Set(masterIdsToFetch)];
@@ -81,14 +96,21 @@ export default function ComponentDetailPage() {
           for (let i = 0; i < uniqueMasterIds.length; i += 30) {
             const batchIds = uniqueMasterIds.slice(i, i + 30);
             if (batchIds.length > 0) {
-                const masterCompsQuery = query(collection(db, 'masterComponents'), where('__name__', 'in', batchIds));
-                const querySnapshot = await getDocs(masterCompsQuery);
-                querySnapshot.forEach(docSnap => masterCompsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as MasterComponent));
+                const { data: masterCompsData, error: masterError } = await db
+                  .from('master_components')
+                  .select('*')
+                  .in('id', batchIds);
+
+                if (masterError) throw masterError;
+
+                (masterCompsData || []).forEach((masterComp: any) => {
+                  masterCompsMap.set(masterComp.id, masterComp);
+                });
             }
           }
       }
 
-      const mainMasterComp = masterCompsMap.get(mainUserComp.masterComponentId);
+      const mainMasterComp = masterCompsMap.get(mainUserComp.master_component_id);
       if (mainMasterComp) {
         setComponent({
           ...mainUserComp,
@@ -98,13 +120,13 @@ export default function ComponentDetailPage() {
           series: mainMasterComp.series,
           componentGroup: mainMasterComp.system,
           id: mainUserComp.id,
-          purchaseDate: toDate(mainUserComp.purchaseDate),
-          lastServiceDate: toNullableDate(mainUserComp.lastServiceDate),
+          purchaseDate: toDate(mainUserComp.purchase_date),
+          lastServiceDate: toNullableDate(mainUserComp.last_service_date),
         });
       }
 
       const combinedSubComponents: Component[] = subUserComps.flatMap(subUserComp => {
-        const masterComp = masterCompsMap.get(subUserComp.masterComponentId);
+        const masterComp = masterCompsMap.get(subUserComp.master_component_id);
         if (!masterComp) return [];
         return [{
           ...subUserComp,
@@ -114,8 +136,8 @@ export default function ComponentDetailPage() {
           series: masterComp.series,
           componentGroup: masterComp.system,
           id: subUserComp.id,
-          purchaseDate: toDate(subUserComp.purchaseDate),
-          lastServiceDate: toNullableDate(subUserComp.lastServiceDate),
+          purchaseDate: toDate(subUserComp.purchase_date),
+          lastServiceDate: toNullableDate(subUserComp.last_service_date),
         }];
       });
 
@@ -154,12 +176,17 @@ export default function ComponentDetailPage() {
     
     const updatedLog = [...equipment.maintenanceLog, logWithId];
     
-    const equipmentDocRef = doc(db, 'users', clientId, 'equipment', equipment.id);
-    await updateDoc(equipmentDocRef, {
-      maintenanceLog: updatedLog.map(l => ({...l, date: toDate(l.date)})),
-    });
+    const { error } = await db
+      .from('equipment')
+      .update({
+        maintenance_log: updatedLog.map(l => ({...l, date: typeof l.date === 'string' ? l.date : l.date.toISOString()})),
+      })
+      .eq('id', equipment.id)
+      .eq('user_id', clientId);
 
-    handleSuccess(); // Re-fetch data
+    if (!error) {
+      handleSuccess(); // Re-fetch data
+    }
   }
 
 

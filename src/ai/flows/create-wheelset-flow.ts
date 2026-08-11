@@ -1,6 +1,5 @@
 
 import { z } from 'zod';
-import { doc, writeBatch, collection, serverTimestamp } from '@/lib/firestore-compat';
 import { db } from '@/lib/firebase';
 
 const WheelsetDataSchema = z.object({
@@ -22,33 +21,43 @@ export async function createWheelset(input: CreateWheelsetInput): Promise<void> 
     throw new Error('User ID is required to create a wheelset.');
   }
 
-  const batch = writeBatch(db);
+  const wheelsetId = crypto.randomUUID();
+  const now = new Date().toISOString();
 
-  const newWheelsetRef = doc(collection(db, 'users', userId, 'equipment'));
   const newWheelsetPayload = {
-    id: newWheelsetRef.id,
+    id: wheelsetId,
+    user_id: userId,
     name,
     brand: brand || null,
     model: model || null,
     type,
-    createdAt: serverTimestamp(),
-    totalDistance: 0,
-    totalHours: 0,
+    created_at: now,
+    total_distance: 0,
+    total_hours: 0,
     components: [],
-    maintenanceLog: [],
+    maintenance_log: [],
   };
 
-  batch.set(newWheelsetRef, newWheelsetPayload);
-
-  const parentEquipmentRef = doc(db, 'users', userId, 'equipment', parentEquipmentId);
-  batch.update(parentEquipmentRef, {
-    associatedEquipmentIds: [newWheelsetRef.id],
-  });
-
   try {
-    await batch.commit();
+    // Insert new wheelset
+    const { error: insertError } = await db
+      .from('equipment')
+      .insert([newWheelsetPayload]);
+
+    if (insertError) throw insertError;
+
+    // Update parent equipment with associated wheelset ID
+    const { error: updateError } = await db
+      .from('equipment')
+      .update({
+        associated_equipment_ids: [wheelsetId],
+      })
+      .eq('id', parentEquipmentId)
+      .eq('user_id', userId);
+
+    if (updateError) throw updateError;
   } catch (error) {
-    console.error('Error creating wheelset in batch:', error);
+    console.error('Error creating wheelset:', error);
     throw new Error('Failed to create wheelset. The operation could not be completed.');
   }
 }

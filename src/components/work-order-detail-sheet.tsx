@@ -18,7 +18,6 @@ import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { BikeFitDialog } from './bike-fit-dialog';
-import { doc, getDoc } from '@/lib/firestore-compat';
 import { db } from '@/lib/firebase';
 import type { Equipment } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
@@ -43,17 +42,22 @@ export function WorkOrderDetailSheet({
     if (isOpen && workOrder?.userId && workOrder?.equipmentId) {
         setLoadingEquipment(true);
         try {
-          const equipmentDocRef = doc(db, 'users', workOrder.userId, 'equipment', workOrder.equipmentId);
-          const docSnap = await getDoc(equipmentDocRef);
-          if (docSnap.exists) {
-            setEquipment({ id: docSnap.id, ...docSnap.data() } as Equipment);
-          } else {
+          const { data, error } = await db
+            .from('equipment')
+            .select('*')
+            .eq('id', workOrder.equipmentId)
+            .eq('user_id', workOrder.userId)
+            .single();
+
+          if (error || !data) {
             toast({
               variant: 'destructive',
               title: 'Error',
               description: 'Could not find the equipment associated with this work order.',
             });
             setEquipment(null);
+          } else {
+            setEquipment(data as Equipment);
           }
         } catch (error) {
           console.error("Error fetching equipment:", error);

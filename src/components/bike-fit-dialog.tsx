@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
-import { doc, updateDoc } from '@/lib/firestore-compat';
 
 import { db } from '@/lib/firebase';
 import type { Equipment, BikeFitData, CleatPosition } from '@/lib/types';
@@ -107,9 +106,6 @@ export function BikeFitDialog({ children, equipment, userId, onSuccess }: BikeFi
     setIsSaving(true);
     
     try {
-      // Use the passed-in userId to reference the client's document
-      const equipmentDocRef = doc(db, 'users', userId, 'equipment', equipment.id);
-      
       const cleanedData: Partial<BikeFitData> = {};
       for (const key in data) {
           const typedKey = key as keyof FitFormValues;
@@ -122,16 +118,22 @@ export function BikeFitDialog({ children, equipment, userId, onSuccess }: BikeFi
           }
       }
 
-      await updateDoc(equipmentDocRef, {
-        fitData: cleanedData,
-      });
+      const { error } = await db
+        .from('equipment')
+        .update({
+          fit_data: cleanedData,
+        })
+        .eq('id', equipment.id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
 
       toast({ title: 'Bike Fit Saved!', description: "Client's measurements have been updated." });
       onSuccess();
       handleOpenChange(false);
     } catch (error: any) {
       console.error("Failed to save bike fit data:", error);
-      toast({ variant: 'destructive', title: 'Save Failed', description: error.message || 'Check Firestore rules and data.' });
+      toast({ variant: 'destructive', title: 'Save Failed', description: error.message || 'Check security rules and data.' });
     } finally {
         setIsSaving(false);
     }

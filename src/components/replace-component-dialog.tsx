@@ -7,7 +7,6 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2, Replace } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, getDocs } from '@/lib/firestore-compat';
 import { db } from '@/lib/firebase';
 import type { Component, MasterComponent } from '@/lib/types';
 import { replaceUserComponentAction } from '../app/dashboard/equipment/admin-actions';
@@ -108,14 +107,17 @@ export function ReplaceComponentDialog({
       async function loadComponents() {
         setIsLoadingOptions(true);
         try {
-          const q = query(collection(db, 'masterComponents'));
-          const querySnapshot = await getDocs(q);
-          const components = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterComponent));
-          setAllComponentOptions(components);
+          const { data, error } = await db
+            .from('master_components')
+            .select('*');
+
+          if (error) throw error;
+
+          setAllComponentOptions((data || []) as MasterComponent[]);
         } catch (error: any) {
             let description = 'Could not load components.';
-            if (error.message.includes('firestore/failed-precondition') || error.message.includes('index')) {
-                description = 'The database query failed. A Firestore index is likely required. Please check the Firestore console for an index creation link in the error logs.'
+            if (error.message.includes('failed-precondition') || error.message.includes('index')) {
+                description = 'The database query failed. A database index is likely required. Please check the logs.'
             }
             toast({ variant: 'destructive', title: 'Error', description });
         } finally {

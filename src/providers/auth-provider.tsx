@@ -5,7 +5,6 @@ import { createContext, useState, useEffect, ReactNode, useCallback } from 'reac
 import type { User } from '@supabase/supabase-js';
 import { auth, db, getEmailRedirectUrl } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { doc, setDoc, getDoc, onSnapshot } from '@/lib/firestore-compat';
 
 interface AppUser {
   uid: string;
@@ -42,11 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [shopName, setShopName] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleUserDocSnapshot = useCallback((docSnap: any) => {
-    if (docSnap?.exists) {
-      const data = docSnap.data();
-      setOnboardingComplete(data.onboardingComplete || false);
-      setShopName(data.shopName || null);
+  const handleUserDocSnapshot = useCallback((data: any) => {
+    if (data) {
+      setOnboardingComplete(data.onboarding_complete || false);
+      setShopName(data.shop_name || null);
     } else {
       setOnboardingComplete(false);
       setShopName(null);
@@ -56,17 +54,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let unsubscribeAuth: (() => void) | null = null;
-    let unsubscribeFirestore: (() => void) | null = null;
+    let unsubscribeRealtimeChannel: any = null;
 
-    const cleanupFirestore = () => {
-      if (unsubscribeFirestore) {
-        unsubscribeFirestore();
-        unsubscribeFirestore = null;
+    const cleanupRealtime = () => {
+      if (unsubscribeRealtimeChannel) {
+        unsubscribeRealtimeChannel.unsubscribe();
+        unsubscribeRealtimeChannel = null;
       }
     };
 
     const handleAuthState = async (event: string, session: any) => {
-      cleanupFirestore();
+      cleanupRealtime();
       const nextUser = toAppUser(session?.user ?? null);
       setUser(nextUser);
 
@@ -78,22 +76,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setLoading(true);
-      const userDocRef = doc(db, 'users', nextUser.uid);
 
       try {
-        const userDocSnap = await getDoc(userDocRef);
-        if (!userDocSnap.exists) {
-          await setDoc(db, userDocRef, {
-            email: nextUser.email,
-            createdAt: new Date(),
-            onboardingComplete: false,
-          });
+        // Check if user doc exists and create if not
+        const { data: existingUser } = await db
+          .from('service_providers')
+          .select('*')
+          .eq('id', nextUser.uid)
+          .single();
+
+        if (!existingUser) {
+          await db
+            .from('service_providers')
+            .insert([{
+              id: nextUser.uid,
+              email: nextUser.email,
+              created_at: new Date().toISOString(),
+              onboarding_complete: false,
+            }]);
         }
 
-        unsubscribeFirestore = onSnapshot(db, userDocRef, handleUserDocSnapshot, (error) => {
-          console.warn('Firestore compatibility snapshot error:', error);
-          setLoading(false);
-        });
+        // Fetch current data
+        const { data: userData, error: fetchError } = await db
+          .from('service_providers')
+          .select('*')
+          .eq('id', nextUser.uid)
+          .single();
+
+        if (!fetchError && userData) {
+          handleUserDocSnapshot(userData);
+        } else {
+          handleUserDocSnapshot(null);
+        }
+
+        // Subscribe to real-time updates
+        unsubscribeRealtimeChannel = db
+          .channel(`service-providers:${nextUser.uid}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'service_providers',
+              filter: `id=eq.${nextUser.uid}`,
+            },
+            (payload: any) => {
+              if (payload.new) {
+                handleUserDocSnapshot(payload.new);
+              }
+            }
+          )
+          .subscribe();
+
       } catch (error: any) {
         console.warn('AuthProvider user document load failed:', error);
         setOnboardingComplete(false);
@@ -118,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return () => {
-      cleanupFirestore();
+      cleanupRealtime();
       if (unsubscribeAuth) {
         unsubscribeAuth();
       }
@@ -149,16 +183,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const newUser = data.user;
     if (newUser && data.session) {
       const userData = {
+        id: newUser.id,
         email: newUser.email ?? null,
-        shopName,
-        createdAt: new Date(),
-        onboardingComplete: false,
+        shop_name: shopName,
+        created_at: new Date().toISOString(),
+        onboarding_complete: false,
       };
-      await setDoc(db, doc(db, 'users', newUser.id), userData);
-      await setDoc(db, doc(db, 'serviceProviders', newUser.id), {
-        ownerId: newUser.id,
-        shopName,
-      }, { merge: true });
+      
+      // Insert into both tables
+      await db
+        .from('service_providers')
+        .insert([userData]);
+
+      await db
+        .from('app_users')
+        .insert([{
+          id: newUser.id,
+          email: newUser.email,
+          created_at: new Date().toISOString(),
+        }]);
+
       setOnboardingComplete(false);
       setShopName(shopName);
     } else if (newUser) {
