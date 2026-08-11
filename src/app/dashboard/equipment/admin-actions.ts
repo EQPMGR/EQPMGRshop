@@ -1,6 +1,5 @@
 'use server';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc } from '@/lib/firestore-compat';
 import type { UserComponent, MasterComponent, MaintenanceLog } from '@/lib/types';
 
 const createComponentId = (component: Partial<MasterComponent>) => {
@@ -50,26 +49,39 @@ export async function replaceUserComponentAction({
   }
 
   try {
-    const componentToReplaceRef = doc(db, 'users', userId, 'equipment', equipmentId, 'components', userComponentIdToReplace);
-    const componentToReplaceSnap = await getDoc(componentToReplaceRef);
+    // Get the component to replace
+    const { data: componentToReplace, error: componentError } = await db
+      .from('components')
+      .select('*')
+      .eq('id', userComponentIdToReplace)
+      .eq('equipment_id', equipmentId)
+      .eq('user_id', userId)
+      .single();
 
-    if (!componentToReplaceSnap.exists) {
+    if (componentError || !componentToReplace) {
       throw new Error(`Component with ID ${userComponentIdToReplace} not found.`);
     }
 
-    const componentData = componentToReplaceSnap.data() as UserComponent;
-    const masterComponentRef = doc(db, 'masterComponents', componentData.masterComponentId);
-    const masterComponentSnap = await getDoc(masterComponentRef);
+    // Get the master component we're replacing
+    const { data: masterComponentToReplace, error: masterError } = await db
+      .from('master_components')
+      .select('*')
+      .eq('id', componentToReplace.master_component_id)
+      .single();
 
-    if (!masterComponentSnap.exists) {
-      throw new Error(`Master component ${componentData.masterComponentId} not found.`);
+    if (masterError || !masterComponentToReplace) {
+      throw new Error(`Master component ${componentToReplace.master_component_id} not found.`);
     }
 
-    const masterComponentToReplace = { id: masterComponentSnap.id, ...masterComponentSnap.data() } as MasterComponent;
-    const equipmentDocRef = doc(db, 'users', userId, 'equipment', equipmentId);
-    const equipmentDocSnap = await getDoc(equipmentDocRef);
+    // Get the equipment
+    const { data: equipment, error: equipmentError } = await db
+      .from('equipment')
+      .select('*')
+      .eq('id', equipmentId)
+      .eq('user_id', userId)
+      .single();
 
-    if (!equipmentDocSnap.exists) {
+    if (equipmentError || !equipment) {
       throw new Error('Equipment not found in user data.');
     }
 
@@ -79,19 +91,24 @@ export async function replaceUserComponentAction({
 
     if (newMasterComponentId) {
       finalNewMasterComponentId = newMasterComponentId;
-      const newMasterCompDoc = await getDoc(doc(db, 'masterComponents', finalNewMasterComponentId));
-      if (!newMasterCompDoc.exists) {
+      const { data: newMasterComp, error: newMasterError } = await db
+        .from('master_components')
+        .select('*')
+        .eq('id', finalNewMasterComponentId)
+        .single();
+
+      if (newMasterError || !newMasterComp) {
         throw new Error('Selected replacement component not found in database.');
       }
-      const masterData = newMasterCompDoc.data() as MasterComponent;
-      newComponentSize = masterData.size;
+
+      newComponentSize = newMasterComp.size;
       newComponentDetails = {
-        name: masterData.name,
-        brand: masterData.brand,
-        model: masterData.model,
-        series: masterData.series,
-        size: masterData.size,
-        system: masterData.system,
+        name: newMasterComp.name,
+        brand: newMasterComp.brand,
+        model: newMasterComp.model,
+        series: newMasterComp.series,
+        size: newMasterComp.size,
+        system: newMasterComp.system,
       };
     } else {
       newComponentDetails = {
@@ -113,16 +130,20 @@ export async function replaceUserComponentAction({
         Object.entries(newComponentDetails).filter(([, value]) => value != null && value !== '')
       );
 
-      await setDoc(doc(db, 'masterComponents', finalNewMasterComponentId), cleanNewComponentDetails, { merge: true });
+      // Upsert the new master component
+      await db.from('master_components').upsert(
+        { id: finalNewMasterComponentId, ...cleanNewComponentDetails },
+        { onConflict: 'id' }
+      );
     }
 
-    const existingLog = Array.isArray(equipmentDocSnap.data().maintenanceLog)
-      ? equipmentDocSnap.data().maintenanceLog
+    const existingLog = Array.isArray(equipment.maintenance_log)
+      ? equipment.maintenance_log
       : [];
 
     const newLogEntry: MaintenanceLog = {
       id: crypto.randomUUID(),
-      date: new Date(),
+      date: new Date().toISOString(),
       componentName: masterComponentToReplace.name,
       serviceType: 'replaced',
       notes: `Replaced ${masterComponentToReplace.brand || ''} ${masterComponentToReplace.model || ''} with ${newComponentDetails.brand || ''} ${newComponentDetails.model || ''}. Reason: ${replacementReason}.`,
@@ -130,27 +151,38 @@ export async function replaceUserComponentAction({
       shopName,
     };
 
-    await updateDoc(equipmentDocRef, {
-      maintenanceLog: [...existingLog, newLogEntry],
-    });
+    // Update equipment with new maintenance log
+    await db
+      .from('equipment')
+      .update({
+        maintenance_log: [...existingLog, newLogEntry],
+      })
+      .eq('id', equipmentId)
+      .eq('user_id', userId);
 
-    const cleanData: Record<string, any> = {
-      masterComponentId: finalNewMasterComponentId,
-      wearPercentage: 0,
-      totalDistance: 0,
-      totalHours: 0,
-      purchaseDate: new Date(),
+    // Update the component with new master component reference
+    const cleanData = {
+      master_component_id: finalNewMasterComponentId,
+      wear_percentage: 0,
+      total_distance: 0,
+      total_hours: 0,
+      purchase_date: new Date().toISOString(),
       notes: `Replaced by ${shopName} on ${new Date().toLocaleDateString()}`,
       size: newComponentSize,
-      parentUserComponentId: componentData.parentUserComponentId,
+      parent_user_component_id: componentToReplace.parent_user_component_id,
     };
 
-    await setDoc(componentToReplaceRef, cleanData, { merge: true });
+    await db
+      .from('components')
+      .update(cleanData)
+      .eq('id', userComponentIdToReplace)
+      .eq('equipment_id', equipmentId)
+      .eq('user_id', userId);
 
     return { success: true, message: 'Component replaced successfully.' };
   } catch (error) {
     console.error('[SERVER ACTION ERROR] in replaceUserComponentAction:', error);
-    if ((error as any).code === 'permission-denied' || (error as any).code === 7) {
+    if ((error as any).code === 'PGRST116' || (error as any).code === 'permission-denied') {
       throw new Error('A permission error occurred. This may be due to access rules.');
     }
     throw new Error((error as Error).message || 'An unexpected error occurred during component replacement.');

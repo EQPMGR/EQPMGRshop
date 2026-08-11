@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, collection, query, where, onSnapshot, DocumentData, orderBy, limit } from '@/lib/firestore-compat';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -44,14 +43,17 @@ export default function DashboardPage() {
 
     const fetchShopSettings = async () => {
         setLoading(true);
-        const serviceProviderRef = doc(db, "serviceProviders", user.uid);
-        const docSnap = await getDoc(serviceProviderRef);
-        if (docSnap.exists) {
-          const data = docSnap.data();
+        const { data, error } = await db
+          .from('service_providers')
+          .select('*')
+          .eq('id', user.uid)
+          .single();
+
+        if (!error && data) {
           setAvailability(data.availability || 'Today');
-          setDropOff(data.dropOff || false);
-          setValetService(data.valetService || false);
-          setHasStripeId(!!data.stripeCustomerId);
+          setDropOff(data.drop_off || false);
+          setValetService(data.valet_service || false);
+          setHasStripeId(!!data.stripe_customer_id);
         }
         setLoading(false);
     };
@@ -62,51 +64,72 @@ export default function DashboardPage() {
     if (!user) return;
 
     setWorkOrdersLoading(true);
-    
-    const recentWorkOrdersQuery = query(
-        collection(db, "workOrders"), 
-        where("serviceProviderId", "==", user.uid),
-        limit(5)
-    );
-    
-    const unsubscribeRecent = onSnapshot(recentWorkOrdersQuery, (querySnapshot) => {
-      const orders: WorkOrder[] = [];
-      querySnapshot.forEach((doc: DocumentData) => {
-        const data = doc.data();
-        
-        let status: WorkOrderStatus = 'New';
-        if (allStatuses.includes(data.status)) {
-            status = data.status;
-        } else if (data.status === 'pending') {
-            status = 'New';
-        }
 
-        orders.push({
-          id: doc.id,
-          customerName: data.userName || 'N/A',
-          bike: data.equipmentBrand && data.equipmentModel ? `${data.equipmentBrand} ${data.equipmentModel}` : 'N/A',
-          issueDescription: data.serviceType || 'No description',
-          createdAt: data.createdAt?.toDate().toLocaleDateString() || 'N/A',
-          status: status,
-          userEmail: data.userEmail || '',
-          userPhone: data.userPhone || '',
-          notes: data.notes || '',
-          equipmentName: data.equipmentName || '',
-          userId: data.userId || '',
-          equipmentId: data.equipmentId || '',
+    const fetchWorkOrders = async () => {
+      try {
+        const { data, error } = await db
+          .from('work_orders')
+          .select('*')
+          .eq('service_provider_id', user.uid)
+          .limit(5);
+
+        if (error) throw error;
+
+        const orders: WorkOrder[] = (data || []).map((row: any) => {
+          let status: WorkOrderStatus = 'New';
+          if (allStatuses.includes(row.status)) {
+            status = row.status;
+          } else if (row.status === 'pending') {
+            status = 'New';
+          }
+
+          return {
+            id: row.id,
+            customerName: row.user_name || 'N/A',
+            bike: row.equipment_brand && row.equipment_model ? `${row.equipment_brand} ${row.equipment_model}` : 'N/A',
+            issueDescription: row.service_type || 'No description',
+            createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A',
+            status: status,
+            userEmail: row.user_email || '',
+            userPhone: row.user_phone || '',
+            notes: row.notes || '',
+            equipmentName: row.equipment_name || '',
+            userId: row.user_id || '',
+            equipmentId: row.equipment_id || '',
+          };
         });
-      });
-      const sortedOrders = orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setRecentWorkOrders(sortedOrders);
-      setWorkOrdersLoading(false);
-    }, (error) => {
+
+        const sortedOrders = orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setRecentWorkOrders(sortedOrders);
+        setWorkOrdersLoading(false);
+      } catch (error: any) {
         console.error("Error fetching recent work orders: ", error);
         toast({ title: "Error", description: "Could not fetch recent work orders.", variant: "destructive" });
         setWorkOrdersLoading(false);
-    });
+      }
+    };
+
+    fetchWorkOrders();
+
+    // Subscribe to real-time updates
+    const channel = db
+      .channel(`work_orders:${user.uid}:recent`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'work_orders',
+          filter: `service_provider_id=eq.${user.uid}`,
+        },
+        () => {
+          fetchWorkOrders();
+        }
+      )
+      .subscribe();
 
     return () => {
-        unsubscribeRecent();
+      channel.unsubscribe();
     };
   }, [user, toast]);
 
@@ -118,12 +141,17 @@ export default function DashboardPage() {
     }
     setSaving(true);
     try {
-      const serviceProviderRef = doc(db, "serviceProviders", user.uid);
-      await updateDoc(serviceProviderRef, {
-        availability,
-        dropOff,
-        valetService,
-      });
+      const { error } = await db
+        .from('service_providers')
+        .update({
+          availability,
+          drop_off: dropOff,
+          valet_service: valetService,
+        })
+        .eq('id', user.uid);
+
+      if (error) throw error;
+
       toast({ title: "Success", description: "Availability settings saved." });
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to save settings.", variant: "destructive" });

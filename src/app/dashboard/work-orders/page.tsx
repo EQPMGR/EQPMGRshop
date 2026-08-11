@@ -5,7 +5,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, DocumentData, doc, updateDoc } from "@/lib/firestore-compat";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -57,53 +56,79 @@ export default function WorkOrdersPage() {
     };
 
     setLoading(true);
-    const q = query(
-        collection(db, "workOrders"), 
-        where("serviceProviderId", "==", user.uid)
-    );
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const orders: WorkOrder[] = [];
-      querySnapshot.forEach((doc: DocumentData) => {
-        const data = doc.data();
-        
-        let status: WorkOrderStatus = 'New';
-        if (allStatuses.includes(data.status)) {
-            status = data.status;
-        } else if (data.status === 'pending') {
-            status = 'New';
-        }
 
-        orders.push({
-          id: doc.id,
-          customerName: data.userName || 'N/A',
-          bike: data.equipmentBrand && data.equipmentModel ? `${data.equipmentBrand} ${data.equipmentModel}` : 'N/A',
-          issueDescription: data.serviceType || 'No description',
-          createdAt: data.createdAt?.toDate().toLocaleDateString() || 'N/A',
-          status: status,
-          userEmail: data.userEmail || '',
-          userPhone: data.userPhone || '',
-          notes: data.notes || '',
-          equipmentName: data.equipmentName || '',
-          userId: data.userId || '',
-          equipmentId: data.equipmentId || '',
+    // Helper function to fetch and process work orders
+    const fetchWorkOrders = async () => {
+      try {
+        const { data, error } = await db
+          .from('work_orders')
+          .select('*')
+          .eq('service_provider_id', user.uid);
+
+        if (error) throw error;
+
+        const orders: WorkOrder[] = (data || []).map((row: any) => {
+          let status: WorkOrderStatus = 'New';
+          if (allStatuses.includes(row.status)) {
+            status = row.status;
+          } else if (row.status === 'pending') {
+            status = 'New';
+          }
+
+          return {
+            id: row.id,
+            customerName: row.user_name || 'N/A',
+            bike: row.equipment_brand && row.equipment_model ? `${row.equipment_brand} ${row.equipment_model}` : 'N/A',
+            issueDescription: row.service_type || 'No description',
+            createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A',
+            status: status,
+            userEmail: row.user_email || '',
+            userPhone: row.user_phone || '',
+            notes: row.notes || '',
+            equipmentName: row.equipment_name || '',
+            userId: row.user_id || '',
+            equipmentId: row.equipment_id || '',
+          };
         });
-      });
-       // Sort client-side to avoid index requirement & complex sorting
-      const sortedOrders = orders.sort((a, b) => {
-        if (a.status === 'Completed' && b.status !== 'Completed') return 1;
-        if (a.status !== 'Completed' && b.status === 'Completed') return -1;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-      setWorkOrders(sortedOrders);
-      setLoading(false);
-    }, (error) => {
+
+        // Sort client-side to avoid index requirement & complex sorting
+        const sortedOrders = orders.sort((a, b) => {
+          if (a.status === 'Completed' && b.status !== 'Completed') return 1;
+          if (a.status !== 'Completed' && b.status === 'Completed') return -1;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        setWorkOrders(sortedOrders);
+        setLoading(false);
+      } catch (error: any) {
         console.error("Error fetching work orders: ", error);
         toast({ title: "Error", description: "Could not fetch work orders.", variant: "destructive" });
         setLoading(false);
-    });
+      }
+    };
 
-    return () => unsubscribe();
+    // Initial fetch
+    fetchWorkOrders();
+
+    // Subscribe to real-time updates
+    const channel = db
+      .channel(`work_orders:${user.uid}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'work_orders',
+          filter: `service_provider_id=eq.${user.uid}`,
+        },
+        () => {
+          fetchWorkOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, [user, toast]);
 
   const handleGetPriority = (id: string) => {
@@ -132,19 +157,22 @@ export default function WorkOrdersPage() {
     if (!selectedWorkOrder || !statusToUpdate) return;
 
     setUpdatingStatus(true);
-    const workOrderRef = doc(db, "workOrders", selectedWorkOrder.id);
 
     try {
-        await updateDoc(workOrderRef, {
-            status: statusToUpdate
-        });
-        toast({ title: "Success", description: "Work order status updated."});
-        setIsStatusDialogOpen(false);
-        setSelectedWorkOrder(null);
+      const { error } = await db
+        .from('work_orders')
+        .update({ status: statusToUpdate })
+        .eq('id', selectedWorkOrder.id);
+
+      if (error) throw error;
+
+      toast({ title: "Success", description: "Work order status updated." });
+      setIsStatusDialogOpen(false);
+      setSelectedWorkOrder(null);
     } catch (error: any) {
-        toast({ title: "Error", description: error.message || "Failed to update status.", variant: "destructive"});
+      toast({ title: "Error", description: error.message || "Failed to update status.", variant: "destructive" });
     } finally {
-        setUpdatingStatus(false);
+      setUpdatingStatus(false);
     }
   }
 

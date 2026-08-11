@@ -11,7 +11,6 @@ import {
   PlusCircle,
   Zap,
 } from 'lucide-react';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from '@/lib/firestore-compat';
 
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';

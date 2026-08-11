@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, where } from '@/lib/firestore-compat';
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -39,21 +38,52 @@ export default function EmployeesPage() {
             return;
         }
         setLoading(true);
-        const q = query(collection(db, 'employees'), where('shopId', '==', user.uid));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetchedEmployees: Employee[] = [];
-            snapshot.forEach((doc: any) => {
-                fetchedEmployees.push({ id: doc.id, ...doc.data() } as Employee);
-            });
-            setEmployees(fetchedEmployees);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching employees: ", error);
-            toast({ title: "Error", description: "Could not fetch employees.", variant: "destructive" });
-            setLoading(false);
-        });
 
-        return () => unsubscribe();
+        const fetchEmployees = async () => {
+            try {
+                const { data, error } = await db
+                    .from('employees')
+                    .select('*')
+                    .eq('shop_id', user.uid);
+
+                if (error) throw error;
+                setEmployees((data || []).map(emp => ({
+                    id: emp.id,
+                    name: emp.name,
+                    email: emp.email,
+                    role: emp.role,
+                    shopId: emp.shop_id,
+                })));
+                setLoading(false);
+            } catch (error: any) {
+                console.error("Error fetching employees: ", error);
+                toast({ title: "Error", description: "Could not fetch employees.", variant: "destructive" });
+                setLoading(false);
+            }
+        };
+
+        fetchEmployees();
+
+        // Subscribe to real-time updates
+        const channel = db
+            .channel(`employees:${user.uid}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'employees',
+                    filter: `shop_id=eq.${user.uid}`,
+                },
+                () => {
+                    fetchEmployees();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            channel.unsubscribe();
+        };
     }, [user, toast]);
 
     const handleAddEmployee = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -66,10 +96,15 @@ export default function EmployeesPage() {
             name: formData.get('name') as string,
             email: formData.get('email') as string,
             role: 'Staff', // default role
-            shopId: user.uid,
+            shop_id: user.uid,
         };
         try {
-            await addDoc(collection(db, 'employees'), newEmployeeData);
+            const { error } = await db
+                .from('employees')
+                .insert([newEmployeeData]);
+
+            if (error) throw error;
+
             toast({ title: "Success", description: "Employee added successfully."});
             setOpen(false);
             event.currentTarget.reset();
@@ -82,7 +117,13 @@ export default function EmployeesPage() {
 
     const handleDeleteEmployee = async (employeeId: string) => {
         try {
-            await deleteDoc(doc(db, 'employees', employeeId));
+            const { error } = await db
+                .from('employees')
+                .delete()
+                .eq('id', employeeId);
+
+            if (error) throw error;
+
             toast({ title: "Success", description: "Employee deleted."});
         } catch (error: any) {
             toast({ title: "Error", description: error.message || "Failed to delete employee.", variant: "destructive"});

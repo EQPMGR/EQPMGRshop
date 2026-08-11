@@ -10,9 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { countries, getStates } from "@/lib/countries";
-import { doc, getDoc, updateDoc, setDoc } from "@/lib/firestore-compat";
 import { db } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "@/lib/storage-compat";
+import { storage } from "@supabase/supabase-js";
+import { ref, uploadBytes, getDownloadURL } from "@supabase/storage-js";
 import { encodeGeohash } from '@/lib/geohash';
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,21 +57,24 @@ export default function SettingsPage() {
     useEffect(() => {
         const fetchShopData = async () => {
             if (user) {
-                const serviceProviderRef = doc(db, "serviceProviders", user.uid);
-                const docSnap = await getDoc(serviceProviderRef);
-                if (docSnap.exists) {
-                    const data = docSnap.data();
+                const { data, error } = await db
+                  .from('service_providers')
+                  .select('*')
+                  .eq('id', user.uid)
+                  .single();
+
+                if (!error && data) {
                     const storedServices = Array.isArray(data.services) ? data.services : [];
                     setShopData({
-                        shopName: data.shopName || '',
-                        streetAddress: data.streetAddress || '',
+                        shopName: data.shop_name || '',
+                        streetAddress: data.street_address || '',
                         city: data.city || '',
                         country: data.country || '',
                         state: data.state || '',
-                        postalCode: data.postalCode || '',
+                        postalCode: data.postal_code || '',
                         phone: data.phone || '',
                         website: data.website || '',
-                        logoUrl: data.logoUrl || '',
+                        logoUrl: data.logo_url || '',
                         services: storedServices,
                     });
                     setServiceSelections({
@@ -80,8 +83,8 @@ export default function SettingsPage() {
                         rental: storedServices.includes('rental'),
                     });
                     setSelectedCountry(data.country || '');
-                    if (data.logoUrl) {
-                        setLogoPreview(data.logoUrl);
+                    if (data.logo_url) {
+                        setLogoPreview(data.logo_url);
                     }
                 }
             }
@@ -124,9 +127,17 @@ export default function SettingsPage() {
             let logoUrl = shopData.logoUrl;
             if (logoFile) {
                 const safeFileName = logoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-                const storageRef = ref(undefined, `logos/${user.uid}/${safeFileName}`);
-                await uploadBytes(storageRef, logoFile);
-                logoUrl = await getDownloadURL(storageRef);
+                const { data, error } = await db.storage
+                  .from('logos')
+                  .upload(`${user.uid}/${safeFileName}`, logoFile, { upsert: true });
+
+                if (error) throw error;
+                
+                const { data: publicUrl } = db.storage
+                  .from('logos')
+                  .getPublicUrl(`${user.uid}/${safeFileName}`);
+                
+                logoUrl = publicUrl.publicUrl;
             }
 
             const fullAddress = `${shopData.streetAddress}, ${shopData.city}, ${shopData.state}, ${shopData.country}, ${shopData.postalCode}`;
@@ -166,20 +177,33 @@ export default function SettingsPage() {
                 .map((option) => option.value);
 
             const updatedData = {
-                ...shopData,
-                logoUrl,
+                shop_name: shopData.shopName,
+                street_address: shopData.streetAddress,
+                city: shopData.city,
+                country: shopData.country,
+                state: shopData.state,
+                postal_code: shopData.postalCode,
+                phone: shopData.phone,
                 website: websiteUrl,
+                logo_url: logoUrl,
                 address: fullAddress,
-                ownerId: user.uid,
+                owner_id: user.uid,
                 services: selectedServices,
                 ...locationData,
             };
 
-            const serviceProviderRef = doc(db, "serviceProviders", user.uid);
-            await setDoc(serviceProviderRef, updatedData, { merge: true });
+            const { error: updateError } = await db
+              .from('service_providers')
+              .upsert({ id: user.uid, ...updatedData }, { onConflict: 'id' });
 
-            const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, { shopName: shopData.shopName });
+            if (updateError) throw updateError;
+
+            const { error: userUpdateError } = await db
+              .from('app_users')
+              .update({ shop_name: shopData.shopName })
+              .eq('id', user.uid);
+
+            if (userUpdateError) throw userUpdateError;
 
             toast({ title: "Success", description: "Shop details updated successfully!" });
         } catch (error: any) {

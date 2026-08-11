@@ -2,7 +2,6 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { doc, deleteDoc } from '@/lib/firestore-compat';
 
 export async function deleteUserComponentAction({
     userId,
@@ -18,12 +17,20 @@ export async function deleteUserComponentAction({
     }
 
     try {
-        await deleteDoc(doc(db, 'users', userId, 'equipment', equipmentId, 'components', userComponentId));
+        const { error } = await db
+            .from('components')
+            .delete()
+            .eq('id', userComponentId)
+            .eq('equipment_id', equipmentId)
+            .eq('user_id', userId);
+
+        if (error) throw error;
+
         return { success: true, message: 'Component deleted successfully.' };
 
     } catch(error) {
         console.error('[SERVER ACTION ERROR] in deleteUserComponentAction:', error);
-        if ((error as any).code === 'permission-denied' || (error as any).code === 7) {
+        if ((error as any).code === 'PGRST116' || (error as any).code === 'permission-denied') {
             throw new Error('A permission error occurred. This may be due to access rules.');
         }
         throw new Error((error as Error).message || 'An unexpected error occurred.');

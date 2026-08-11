@@ -14,7 +14,6 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { doc, updateDoc, setDoc, getDoc } from '@/lib/firestore-compat';
 import { db } from '@/lib/firebase';
 import { encodeGeohash } from '@/lib/geohash';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -112,13 +111,13 @@ export default function OnboardingPage() {
 
         try {
             const shopData = {
-                shopName: data.shopName,
+                shop_name: data.shopName,
                 address: fullAddress,
-                streetAddress: data.streetAddress,
+                street_address: data.streetAddress,
                 city: data.city,
                 state: data.state,
                 country: data.country,
-                postalCode: data.postalCode,
+                postal_code: data.postalCode,
                 phone: data.phone,
                 services: selectedServices,
             };
@@ -148,21 +147,29 @@ export default function OnboardingPage() {
 
             const locationData = lat !== undefined && lng !== undefined ? { lat, lng, ...(geohash ? { geohash } : {}) } : {};
 
-            // 2. Update the user document
-            const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, {
+            // Update the user document
+            const { error: userError } = await db
+              .from('app_users')
+              .update({
                 ...shopData,
-                onboardingComplete: true,
+                onboarding_complete: true,
                 ...locationData,
-            });
+              })
+              .eq('id', user.uid);
 
-            // 3. Create a new document in serviceProviders
-            const serviceProviderRef = doc(db, "serviceProviders", user.uid);
-            await setDoc(serviceProviderRef, {
+            if (userError) throw userError;
+
+            // Create/upsert service provider document
+            const { error: providerError } = await db
+              .from('service_providers')
+              .upsert({
+                id: user.uid,
                 ...shopData,
-                ownerId: user.uid,
+                owner_id: user.uid,
                 ...locationData,
-            });
+              }, { onConflict: 'id' });
+
+            if (providerError) throw providerError;
 
             toast({
                 title: "Shop Information Saved!",
@@ -181,14 +188,20 @@ export default function OnboardingPage() {
     // Redirect if user is not logged in or has already completed onboarding
     useEffect(() => {
         if (!authLoading && user) {
-            const userDocRef = doc(db, "users", user.uid);
-            getDoc(userDocRef).then(docSnap => {
-                if (docSnap.exists && docSnap.data().onboardingComplete) {
+            const checkOnboarding = async () => {
+                const { data, error } = await db
+                  .from('app_users')
+                  .select('onboarding_complete')
+                  .eq('id', user.uid)
+                  .single();
+
+                if (!error && data?.onboarding_complete) {
                     router.push('/dashboard');
                 }
-            });
+            };
+            checkOnboarding();
         }
-         if (!authLoading && !user) {
+        if (!authLoading && !user) {
             router.push('/');
         }
     }, [user, authLoading, router]);
