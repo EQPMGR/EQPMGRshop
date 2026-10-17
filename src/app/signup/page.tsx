@@ -28,7 +28,6 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
     try {
-      // In a real app, you'd also save the shopName to your database (e.g., Firestore)
       await signup(email, password, shopName);
       toast({
         title: "Account Created",

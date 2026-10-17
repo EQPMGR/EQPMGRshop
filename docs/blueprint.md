@@ -14,5 +14,5 @@
 - Background color: Dark Green (#2A5D59) provides a sophisticated backdrop.
 - Accent color: Burnt Orange (#D98443) for call-to-action elements and highlights.
 - Text color: Very light gray for readability on the dark background.
-- Header font: 'Montserrat' (sans-serif) for titles and headings. Note: currently only Google Fonts are supported.
-- Body font: 'Inter' (sans-serif) for all main text content. Note: currently only Google Fonts are supported.
+- Header font: 'Montserrat' (sans-serif) for titles and headings.
+- Body font: 'Inter' (sans-serif) for all main text content.

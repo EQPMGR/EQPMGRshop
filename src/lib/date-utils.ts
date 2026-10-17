@@ -1,7 +1,7 @@
 
 import { format } from 'date-fns';
 
-// Firebase Timestamps can be objects. This safely converts them to JS Date.
+// Accepts Date, ISO string, epoch, or legacy {toDate()} objects and returns a JS Date.
 export const toDate = (date: any): Date => {
   if (!date) return new Date();
   if (date.toDate) return date.toDate();

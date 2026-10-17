@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import type { Equipment, BikeFitData, CleatPosition } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {

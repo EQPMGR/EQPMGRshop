@@ -9,7 +9,7 @@ import { ChevronLeft, Wrench, Loader2, Replace } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { addMaintenanceLogAction } from '@/app/dashboard/equipment/admin-actions';
 import { getAccessToken } from '@/lib/client-auth';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 
 export type AuthenticatedShop = { uid: string; email?: string; shopName: string | null };
 

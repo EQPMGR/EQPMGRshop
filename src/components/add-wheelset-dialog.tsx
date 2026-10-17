@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import type { Equipment } from '@/lib/types';
-import { createWheelset } from '@/ai/flows/create-wheelset-flow';
+import { createWheelset } from '@/lib/wheelsets';
 import { useAuth } from '@/hooks/use-auth';
 import { useSearchParams } from 'next/navigation';
 

@@ -1,6 +1,6 @@
 'use server';
 
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import { verifyShopToken, requireOpenWorkOrder } from '@/lib/server-auth';
 
 // Shops change a customer's bike only through these actions, and only while

@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2, Replace } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import type { Component, MasterComponent } from '@/lib/types';
 import { getAccessToken } from '@/lib/client-auth';
 import { replaceUserComponentAction } from '../app/dashboard/equipment/admin-actions';
