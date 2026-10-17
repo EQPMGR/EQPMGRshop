@@ -100,7 +100,8 @@ export type WorkOrderStatus =
   | "In Service"
   | "Testing"
   | "Bike Ready"
-  | "Completed";
+  | "Completed"
+  | "Cancelled";
 
 export type WorkOrder = {
   id: string;
@@ -130,6 +131,7 @@ export const allStatuses: WorkOrderStatus[] = [
   "Testing",
   "Bike Ready",
   "Completed",
+  "Cancelled",
 ];
 
 export const statusVariant: { [key in WorkOrderStatus]: "default" | "secondary" | "destructive" | "outline" } = {
@@ -143,5 +145,6 @@ export const statusVariant: { [key in WorkOrderStatus]: "default" | "secondary" 
   "Testing": "secondary",
   "Bike Ready": "outline",
   "Completed": "outline",
+  "Cancelled": "destructive",
 };
   

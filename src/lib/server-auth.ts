@@ -30,7 +30,7 @@ export async function verifyShopToken(accessToken: string | null | undefined): P
 }
 
 /** Work order statuses after which the shop may no longer change the bike. */
-const CLOSED_STATUSES = ['Completed', 'cancelled'];
+const CLOSED_STATUSES = ['Completed', 'Cancelled', 'cancelled'];
 
 /**
  * Shops may change a customer's parts only while they have an open work order

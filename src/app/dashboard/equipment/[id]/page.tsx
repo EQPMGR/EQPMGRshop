@@ -13,7 +13,9 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
-import { db } from '@/lib/firebase';
+import { loadCustomerBike } from '@/lib/bike-data';
+import { getAccessToken } from '@/lib/client-auth';
+import { addMaintenanceLogAction } from '@/app/dashboard/equipment/admin-actions';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -84,73 +86,13 @@ export default function EquipmentDetailPage() {
 
   const clientId = searchParams.get('userId');
 
-  const fetchEquipment = useCallback(async (uid: string) => {
+  const fetchEquipment = useCallback(async (_clientId: string) => {
     setIsLoading(true);
     try {
-      // Fetch all equipment to pass to dialogs
-      const allEquipmentQuery = query(collection(db, 'users', uid, 'equipment'));
-      const allEquipmentSnapshot = await getDocs(allEquipmentQuery);
-      const allEq = allEquipmentSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}) as Equipment);
-      setAllEquipment(allEq);
-
-      // Fetch the specific equipment for this page
-      const equipmentId = params.id as string;
-      const equipmentDocRef = doc(db, 'users', uid, 'equipment', equipmentId);
-      const equipmentDocSnap = await getDoc(equipmentDocRef);
-
-      if (equipmentDocSnap.exists) {
-        const equipmentData = equipmentDocSnap.data();
-
-        // Fetch components from the subcollection
-        const componentsQuery = query(collection(db, 'users', uid, 'equipment', equipmentId, 'components'));
-        const componentsSnapshot = await getDocs(componentsQuery);
-        const userComponents: UserComponent[] = componentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserComponent));
-        
-        const masterComponentIds = [...new Set(userComponents.map(c => c.masterComponentId).filter(Boolean))];
-        
-        const masterComponentsMap = new Map<string, MasterComponent>();
-        if (masterComponentIds.length > 0) {
-             for (let i = 0; i < masterComponentIds.length; i += 30) {
-                const batchIds = masterComponentIds.slice(i, i + 30);
-                if (batchIds.length > 0) {
-                    const masterComponentsQuery = query(collection(db, 'masterComponents'), where('__name__', 'in', batchIds));
-                    const querySnapshot = await getDocs(masterComponentsQuery);
-                    querySnapshot.forEach(doc => {
-                        masterComponentsMap.set(doc.id, { id: doc.id, ...doc.data() } as MasterComponent);
-                    });
-                }
-            }
-        }
-
-        const combinedComponents: Component[] = userComponents.flatMap(userComp => {
-            const masterComp = masterComponentsMap.get(userComp.masterComponentId);
-            if (!masterComp) {
-                console.warn(`Master component with ID ${userComp.masterComponentId} not found.`);
-                return [];
-            }
-            return [{
-                ...userComp,
-                componentName: masterComp.name,
-                brand: masterComp.brand,
-                model: masterComp.model,
-                series: masterComp.series,
-                componentGroup: masterComp.system,
-                id: userComp.id, // Use the userComponent's ID for navigation and keys
-                purchaseDate: toDate(userComp.purchaseDate),
-                lastServiceDate: toNullableDate(userComp.lastServiceDate),
-            }];
-        });
-
-        setEquipment({
-            ...equipmentData,
-            id: equipmentId,
-            purchaseDate: toDate(equipmentData.purchaseDate),
-            components: combinedComponents,
-            maintenanceLog: (equipmentData.maintenanceLog || []).map((l: any) => ({
-                ...l,
-                date: toDate(l.date),
-            })),
-        } as Equipment);
+      const { equipment: bike, ownerBikes } = await loadCustomerBike(params.id as string);
+      setAllEquipment(ownerBikes);
+      if (bike) {
+        setEquipment(bike);
       } else {
         toast({ variant: "destructive", title: "Not Found", description: "Could not find the requested equipment." });
         setEquipment(undefined);
@@ -178,21 +120,25 @@ export default function EquipmentDetailPage() {
   
 
   const handleAddLog = async (newLog: Omit<MaintenanceLogType, 'id' | 'shopId' | 'shopName'>) => {
-    if (!clientId || !equipment || !user || !shopName) return;
-    const logWithId = { 
-        ...newLog,
-        id: crypto.randomUUID(),
-        shopId: user.uid,
-        shopName: shopName,
-    };
-    const updatedLog = [...equipment.maintenanceLog, logWithId];
-    
-    const equipmentDocRef = doc(db, 'users', clientId, 'equipment', equipment.id);
-    await updateDoc(equipmentDocRef, {
-      maintenanceLog: updatedLog.map(l => ({...l, date: toDate(l.date)})),
-    });
-
-    setEquipment(prev => prev ? ({ ...prev, maintenanceLog: updatedLog.map(l => ({...l, date: toDate(l.date)})) }) : undefined);
+    if (!equipment) return;
+    try {
+      // Shops can't write to a customer's bike directly; this goes through a
+      // server action that requires an open work order.
+      await addMaintenanceLogAction({
+        accessToken: await getAccessToken(),
+        equipmentId: equipment.id,
+        entry: {
+          date: toDate(newLog.date).toISOString(),
+          componentName: newLog.componentName,
+          serviceType: newLog.serviceType,
+          notes: newLog.notes,
+          cost: newLog.cost,
+        },
+      });
+      await fetchEquipment(clientId ?? '');
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Could not add log entry', description: error.message });
+    }
   }
 
   const systemsToDisplay = useMemo(() => {
