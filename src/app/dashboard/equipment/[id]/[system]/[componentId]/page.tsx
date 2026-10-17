@@ -268,9 +268,6 @@ export default function ComponentDetailPage() {
                 <div className="flex gap-2 flex-wrap">
                     {user && clientId && shopName && (
                         <ReplaceComponentDialog
-                          userId={clientId}
-                          shopId={user.uid}
-                          shopName={shopName}
                           equipmentId={params.id as string}
                           componentToReplace={component}
                           onSuccess={handleSuccess}

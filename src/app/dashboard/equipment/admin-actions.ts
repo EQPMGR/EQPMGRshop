@@ -1,5 +1,6 @@
 'use server';
 import { db } from '@/lib/firebase';
+import { verifyShopToken, requireOpenWorkOrder } from '@/lib/server-auth';
 import type { UserComponent, MasterComponent, MaintenanceLog } from '@/lib/types';
 
 const createComponentId = (component: Partial<MasterComponent>) => {
@@ -16,16 +17,14 @@ const createComponentId = (component: Partial<MasterComponent>) => {
 };
 
 export async function replaceUserComponentAction({
-  userId,
+  accessToken,
   equipmentId,
   userComponentIdToReplace,
   replacementReason,
   newMasterComponentId,
   manualNewComponentData,
-  shopId,
-  shopName,
 }: {
-  userId: string;
+  accessToken: string;
   equipmentId: string;
   userComponentIdToReplace: string;
   replacementReason: 'failure' | 'modification' | 'upgrade';
@@ -37,10 +36,8 @@ export async function replaceUserComponentAction({
     model?: string;
     size?: string;
   } | null;
-  shopId: string;
-  shopName: string;
 }) {
-  if (!userId || !equipmentId || !userComponentIdToReplace) {
+  if (!accessToken || !equipmentId || !userComponentIdToReplace) {
     throw new Error('Missing required parameters for component replacement.');
   }
 
@@ -49,6 +46,14 @@ export async function replaceUserComponentAction({
   }
 
   try {
+    // Who is calling, and do they have an open work order for this bike?
+    // The customer's id comes from the work order, never from the browser.
+    const shop = await verifyShopToken(accessToken);
+    const workOrder = await requireOpenWorkOrder(shop.uid, equipmentId);
+    const userId = workOrder.user_id;
+    const shopId = shop.uid;
+    const shopName = shop.shopName || 'Service provider';
+
     // Get the component to replace
     const { data: componentToReplace, error: componentError } = await db
       .from('components')
