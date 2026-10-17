@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { countries, getStates } from "@/lib/countries";
+import { getAccessToken } from '@/lib/client-auth';
 import { db } from "@/lib/firebase";
 import { storage } from "@supabase/supabase-js";
 import { ref, uploadBytes, getDownloadURL } from "@supabase/storage-js";
@@ -225,8 +226,8 @@ export default function SettingsPage() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    Authorization: `Bearer ${await getAccessToken()}`,
                 },
-                body: JSON.stringify({ userId: user.uid }),
             });
             const data = await response.json();
 

@@ -9,6 +9,7 @@ import { Loader2, Replace } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import type { Component, MasterComponent } from '@/lib/types';
+import { getAccessToken } from '@/lib/client-auth';
 import { replaceUserComponentAction } from '../app/dashboard/equipment/admin-actions';
 import {
   Dialog,
@@ -64,18 +65,12 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 interface ReplaceComponentDialogProps {
-  userId: string;
-  shopId: string;
-  shopName: string;
   equipmentId: string;
   componentToReplace: Component;
   onSuccess: () => void;
 }
 
 export function ReplaceComponentDialog({
-  userId,
-  shopId,
-  shopName,
   equipmentId,
   componentToReplace,
   onSuccess,
@@ -165,7 +160,7 @@ export function ReplaceComponentDialog({
       
       try {
         const result = await replaceUserComponentAction({
-            userId,
+            accessToken: await getAccessToken(),
             equipmentId,
             userComponentIdToReplace: componentToReplace.id,
             replacementReason: data.replacementReason,
@@ -177,8 +172,6 @@ export function ReplaceComponentDialog({
                 model: data.manualModel,
                 size: data.manualSize,
             } : null,
-            shopId,
-            shopName
         });
 
         toast({ title: 'Success!', description: result.message });

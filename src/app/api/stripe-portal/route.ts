@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
+import { getBearerToken, verifyShopToken } from '@/lib/server-auth';
 
 async function stripeRequest(path: string, stripeSecretKey: string, params: Record<string, string>) {
   const response = await fetch(`https://api.stripe.com/v1/${path}`, {
@@ -19,9 +20,12 @@ async function stripeRequest(path: string, stripeSecretKey: string, params: Reco
 }
 
 export async function POST(request: Request) {
-  const { userId } = await request.json().catch(() => ({}));
-  if (!userId) {
-    return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
+  // Use the verified signed-in shop, never an id sent by the browser.
+  let userId: string;
+  try {
+    ({ uid: userId } = await verifyShopToken(getBearerToken(request)));
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Unauthorized.' }, { status: 401 });
   }
 
   const origin = 'https://shop.eqpmgr.com';
