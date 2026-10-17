@@ -7,6 +7,8 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, Wrench, Loader2, Replace } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
+import { addMaintenanceLogAction } from '@/app/dashboard/equipment/admin-actions';
+import { getAccessToken } from '@/lib/client-auth';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -167,25 +169,23 @@ export default function ComponentDetailPage() {
   
    const handleAddLog = async (newLog: Omit<MaintenanceLogType, 'id' | 'shopId' | 'shopName'>) => {
     if (!clientId || !equipment || !user || !shopName) return;
-    const logWithId = { 
-        ...newLog,
-        id: crypto.randomUUID(),
-        shopId: user.uid,
-        shopName: shopName,
-    };
-    
-    const updatedLog = [...equipment.maintenanceLog, logWithId];
-    
-    const { error } = await db
-      .from('equipment')
-      .update({
-        maintenance_log: updatedLog.map(l => ({...l, date: typeof l.date === 'string' ? l.date : l.date.toISOString()})),
-      })
-      .eq('id', equipment.id)
-      .eq('user_id', clientId);
-
-    if (!error) {
+    // Shops can't write to a customer's bike directly; this goes through a
+    // server action that requires an open work order.
+    try {
+      await addMaintenanceLogAction({
+        accessToken: await getAccessToken(),
+        equipmentId: equipment.id,
+        entry: {
+          date: toDate(newLog.date).toISOString(),
+          componentName: newLog.componentName,
+          serviceType: newLog.serviceType,
+          notes: newLog.notes,
+          cost: newLog.cost,
+        },
+      });
       handleSuccess(); // Re-fetch data
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Could not add log entry', description: error.message });
     }
   }
 
