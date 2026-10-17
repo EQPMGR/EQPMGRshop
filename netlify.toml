@@ -1,6 +1,10 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  # Skip the (credit-costing) production build when nothing the app is built
+  # from changed, e.g. docs, ROADMAP.md, CLAUDE.md or supabase/migrations.
+  # Exit 0 = skip. Add [skip netlify] to a commit message to force a skip.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- src public package.json package-lock.json next.config.ts tailwind.config.ts postcss.config.mjs tsconfig.json components.json patches"
 
 [build.environment]
   NODE_ENV = "production"
