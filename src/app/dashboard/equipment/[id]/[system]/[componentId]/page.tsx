@@ -9,7 +9,7 @@ import { ChevronLeft, Wrench, Loader2, Replace } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { addMaintenanceLogAction } from '@/app/dashboard/equipment/admin-actions';
 import { getAccessToken } from '@/lib/client-auth';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,6 +19,8 @@ import type { Component, MasterComponent, UserComponent, MaintenanceLog as Maint
 import { ComponentStatusList } from '@/components/component-status-list';
 import { AddMaintenanceLogDialog } from '@/components/add-maintenance-log-dialog';
 import { ReplaceComponentDialog } from '@/components/replace-component-dialog';
+import { ChainStretchCard } from '@/components/chain-stretch-card';
+import { isChain } from '@/components/chain-stretch-fields';
 
 
 export default function ComponentDetailPage() {
@@ -262,6 +264,10 @@ export default function ComponentDetailPage() {
                     </div>
                 </div>
             )}
+
+             {isChain(component as any) && (
+                <ChainStretchCard equipmentId={params.id as string} componentId={component.id} onRecorded={handleSuccess} />
+             )}
 
              <div className="mt-6 border-t pt-6">
                 <h4 className="font-semibold mb-2">Actions</h4>

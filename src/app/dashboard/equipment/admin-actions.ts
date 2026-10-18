@@ -1,6 +1,6 @@
 'use server';
 
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import { verifyShopToken, requireOpenWorkOrder } from '@/lib/server-auth';
 
 // Shops change a customer's bike only through these actions, and only while
@@ -14,6 +14,7 @@ export async function replaceUserComponentAction({
   replacementReason,
   newMasterComponentId,
   manualNewComponentData,
+  finalStretch,
 }: {
   accessToken: string;
   equipmentId: string;
@@ -27,6 +28,8 @@ export async function replaceUserComponentAction({
     model?: string;
     size?: string;
   } | null;
+  /** Chains: stretch measured at replacement (percent) and the replace-at limit. */
+  finalStretch?: { value: number; threshold: number } | null;
 }) {
   if (!accessToken || !equipmentId || !userComponentIdToReplace) {
     throw new Error('Missing required parameters for component replacement.');
@@ -38,6 +41,13 @@ export async function replaceUserComponentAction({
   try {
     const shop = await verifyShopToken(accessToken);
     const workOrder = await requireOpenWorkOrder(shop.uid, equipmentId);
+
+    if (finalStretch) {
+      await insertChainStretch({
+        componentId: userComponentIdToReplace, equipmentId, shop, workOrderId: workOrder.id,
+        value: finalStretch.value, threshold: finalStretch.threshold, notes: 'Measured at replacement',
+      });
+    }
 
     // Same routine the rider app uses (rider repo migration 015): swaps the part,
     // archives the old one, logs it, and records the replacement data.
@@ -114,4 +124,66 @@ export async function addMaintenanceLogAction({
   if (error) throw error;
 
   return { success: true };
+}
+
+async function insertChainStretch(m: {
+  componentId: string;
+  equipmentId: string;
+  shop: { uid: string; shopName: string | null };
+  workOrderId: string;
+  value: number;
+  threshold: number;
+  notes?: string;
+}) {
+  if (!(m.value >= 0 && m.value <= 5)) throw new Error('Stretch must be between 0% and 5%.');
+  if (![0.5, 0.75, 1].includes(m.threshold)) throw new Error('Unknown chain wear limit.');
+
+  const { data: part, error: partError } = await db
+    .from('components')
+    .select('id, wear_baseline_key')
+    .eq('id', m.componentId)
+    .eq('equipment_id', m.equipmentId)
+    .maybeSingle();
+  if (partError) throw partError;
+  if (!part) throw new Error('Part not found on this bike.');
+  if (part.wear_baseline_key !== 'chain') throw new Error('Stretch can only be recorded for a chain.');
+
+  // Shop measurements are the most reliable field data (rider repo migration 017).
+  const { error } = await db.from('component_measurements').insert({
+    component_id: m.componentId,
+    equipment_id: m.equipmentId,
+    kind: 'chain_stretch',
+    value: m.value,
+    threshold: m.threshold,
+    measured_by: m.shop.uid,
+    measured_by_role: 'shop',
+    shop_name: m.shop.shopName,
+    work_order_id: m.workOrderId,
+    notes: m.notes ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function recordChainStretchAction({
+  accessToken,
+  equipmentId,
+  componentId,
+  value,
+  threshold,
+}: {
+  accessToken: string;
+  equipmentId: string;
+  componentId: string;
+  value: number;
+  threshold: number;
+}): Promise<{ success: boolean; message: string }> {
+  try {
+    const shop = await verifyShopToken(accessToken);
+    const workOrder = await requireOpenWorkOrder(shop.uid, equipmentId);
+    await insertChainStretch({ componentId, equipmentId, shop, workOrderId: workOrder.id, value, threshold });
+    const pct = Math.round((value / threshold) * 100);
+    return { success: true, message: `Recorded ${value}% stretch: about ${pct}% of the way to replacement.` };
+  } catch (error) {
+    return { success: false, message: (error as Error).message || 'Could not record the measurement.' };
+  }
 }

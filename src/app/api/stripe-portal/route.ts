@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import { getBearerToken, verifyShopToken } from '@/lib/server-auth';
 
 async function stripeRequest(path: string, stripeSecretKey: string, params: Record<string, string>) {
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     const customer = await stripeRequest('customers', stripeSecretKey, {
       email: userData?.email ?? '',
       name: userData?.shop_name ?? '',
-      'metadata[firebaseUID]': userId,
+      'metadata[userId]': userId,
     });
 
     customerId = customer.id;

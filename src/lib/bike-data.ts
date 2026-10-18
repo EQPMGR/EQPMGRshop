@@ -1,4 +1,4 @@
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import { toDate, toNullableDate } from '@/lib/date-utils';
 import type { Component, Equipment, MaintenanceLog } from '@/lib/types';
 

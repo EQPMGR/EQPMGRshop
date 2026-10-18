@@ -3,7 +3,7 @@
 
 import { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { auth, db, getEmailRedirectUrl } from '@/lib/firebase';
+import { auth, db, getEmailRedirectUrl } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 interface AppUser {

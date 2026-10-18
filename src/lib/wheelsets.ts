@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 
 const WheelsetDataSchema = z.object({
   name: z.string(),

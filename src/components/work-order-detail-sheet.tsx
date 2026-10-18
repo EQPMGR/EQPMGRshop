@@ -18,7 +18,7 @@ import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { BikeFitDialog } from './bike-fit-dialog';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import type { Equipment } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';

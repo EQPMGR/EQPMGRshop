@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ArrowUpRight } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import type { Equipment, Component, MasterComponent, UserComponent } from '@/lib/types';
 import { toDate, toNullableDate } from '@/lib/date-utils';
 import { useToast } from '@/hooks/use-toast';

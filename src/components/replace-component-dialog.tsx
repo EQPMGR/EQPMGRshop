@@ -7,9 +7,10 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2, Replace } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/supabase';
 import type { Component, MasterComponent } from '@/lib/types';
 import { getAccessToken } from '@/lib/client-auth';
+import { ChainStretchFields, parseChainStretch, isChain, type ChainStretchValue } from '@/components/chain-stretch-fields';
 import { replaceUserComponentAction } from '../app/dashboard/equipment/admin-actions';
 import {
   Dialog,
@@ -80,6 +81,8 @@ export function ReplaceComponentDialog({
   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
   const [allComponentOptions, setAllComponentOptions] = useState<MasterComponent[]>([]);
   const { toast } = useToast();
+  const [finalStretch, setFinalStretch] = useState<ChainStretchValue>({ value: '', threshold: '0.5' });
+  const replacingChain = isChain(componentToReplace as any);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -161,6 +164,7 @@ export function ReplaceComponentDialog({
       try {
         const result = await replaceUserComponentAction({
             accessToken: await getAccessToken(),
+            finalStretch: replacingChain ? parseChainStretch(finalStretch) : null,
             equipmentId,
             userComponentIdToReplace: componentToReplace.id,
             replacementReason: data.replacementReason,
@@ -258,7 +262,7 @@ export function ReplaceComponentDialog({
                         >
                           <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl><RadioGroupItem value="failure" /></FormControl>
-                            <FormLabel className="font-normal">Failure</FormLabel>
+                            <FormLabel className="font-normal">Worn out / failed</FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl><RadioGroupItem value="modification" /></FormControl>
@@ -274,6 +278,12 @@ export function ReplaceComponentDialog({
                     </FormItem>
                   )}
                 />
+                {replacingChain && (
+                  <div className="space-y-2 border-t pt-4">
+                    <p className="text-sm font-medium">Chain stretch at replacement</p>
+                    <ChainStretchFields stretch={finalStretch} onChange={setFinalStretch} optional />
+                  </div>
+                )}
 
                 <DialogFooter>
                     <Button type="submit" disabled={isSaving || !replacementReason || (!selectedModelId && !manualBrand)}>

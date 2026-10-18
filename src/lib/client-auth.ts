@@ -1,4 +1,4 @@
-import { auth } from '@/lib/firebase';
+import { auth } from '@/lib/supabase';
 
 /** The signed-in user's Supabase access token, to send to server actions and API routes. */
 export async function getAccessToken(): Promise<string> {
