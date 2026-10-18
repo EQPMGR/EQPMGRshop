@@ -19,6 +19,8 @@ import type { Component, MasterComponent, UserComponent, MaintenanceLog as Maint
 import { ComponentStatusList } from '@/components/component-status-list';
 import { AddMaintenanceLogDialog } from '@/components/add-maintenance-log-dialog';
 import { ReplaceComponentDialog } from '@/components/replace-component-dialog';
+import { ChainStretchCard } from '@/components/chain-stretch-card';
+import { isChain } from '@/components/chain-stretch-fields';
 
 
 export default function ComponentDetailPage() {
@@ -262,6 +264,10 @@ export default function ComponentDetailPage() {
                     </div>
                 </div>
             )}
+
+             {isChain(component as any) && (
+                <ChainStretchCard equipmentId={params.id as string} componentId={component.id} onRecorded={handleSuccess} />
+             )}
 
              <div className="mt-6 border-t pt-6">
                 <h4 className="font-semibold mb-2">Actions</h4>
