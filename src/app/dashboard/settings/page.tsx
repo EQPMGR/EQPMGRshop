@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { countries, getStates } from "@/lib/countries";
-import { getAccessToken } from '@/lib/client-auth';
+import { BillingCard } from "@/components/billing-card";
 import { db } from "@/lib/supabase";
 import { storage } from "@supabase/supabase-js";
 import { ref, uploadBytes, getDownloadURL } from "@supabase/storage-js";
@@ -50,7 +50,6 @@ export default function SettingsPage() {
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [billingLoading, setBillingLoading] = useState(false);
     const [selectedCountry, setSelectedCountry] = useState<string>('');
     const states = getStates(selectedCountry);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -215,34 +214,6 @@ export default function SettingsPage() {
         }
     };
 
-    const handleManageBilling = async () => {
-        if (!user) {
-            toast({ title: "Error", description: "You must be logged in.", variant: 'destructive'});
-            return;
-        }
-        setBillingLoading(true);
-        try {
-            const response = await fetch('/api/stripe-portal', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${await getAccessToken()}`,
-                },
-            });
-            const data = await response.json();
-
-            if (!response.ok || !data.url) {
-                throw new Error(data.error || 'Could not create billing session.');
-            }
-
-            window.location.href = data.url;
-        } catch (error: any) {
-            toast({ title: "Error", description: error.message || "An unexpected error occurred.", variant: 'destructive' });
-        } finally {
-            setBillingLoading(false);
-        }
-    }
-
     if (loading) {
         return (
             <div className="flex h-full w-full items-center justify-center">
@@ -381,36 +352,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-            <CardTitle className="font-headline text-primary">Billing</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-             <div className="prose prose-sm prose-invert max-w-none text-muted-foreground">
-                <p><b>Subscription and Billing Information</b></p>
-                <p>Welcome! To ensure your shop can start receiving work orders from athletes, you need to set up your payment method through our secure Stripe portal.</p>
-                <p><b>How Billing Works:</b></p>
-                <ul>
-                    <li><b>Cost:</b> You will be charged $2.00 CAD (Canadian Dollars) for every new work order your shop successfully receives.</li>
-                    <li><b>Billing Cycle:</b> We aggregate your usage over the month. On the 20th of every month, Stripe will automatically process a single charge for the total number of work orders received in the previous month.</li>
-                    <li><b>Mandatory Setup:</b> Setting up a valid payment method via Stripe is required to activate your shop and become eligible to receive work orders from our network of athletes. Your shop will not appear as available until this setup is complete.</li>
-                </ul>
-                <p><b>Next Step: Manage Billing</b></p>
-                <p>Clicking the "Manage Billing" button will securely redirect you to the Stripe Customer Portal. Stripe handles all payment processing and card data; we never store your sensitive information.</p>
-                <ul>
-                    <li>If this is your first time, you will be prompted to securely enter your credit card details.</li>
-                    <li>If you are already signed up, you can use the portal to update your card, view past invoices, or check your current plan status.</li>
-                </ul>
-            </div>
-
-            <div className="rounded-lg border border-border p-4 text-center">
-                 <Button onClick={handleManageBilling} disabled={billingLoading}>
-                    {billingLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Manage Billing'}
-                </Button>
-            </div>
-            
-        </CardContent>
-      </Card>
+      {user && <BillingCard shopId={user.uid} />}
     </div>
   );
 }
