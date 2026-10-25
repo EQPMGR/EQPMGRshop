@@ -203,7 +203,7 @@ export default function SystemDetailPage() {
           ) : (
              <div className="text-center py-10 border-2 border-dashed rounded-lg col-span-full">
                 <h3 className="text-lg font-semibold">No Components</h3>
-                <p className="text-muted-foreground">No components found for the {systemName} system.</p>
+                <p className="text-muted-foreground">No components found for the {systemName === 'Brakes' ? 'Brake' : systemName} system.</p>
             </div>
           )}
         </CardContent>
