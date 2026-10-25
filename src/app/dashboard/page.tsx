@@ -17,12 +17,15 @@ import Link from 'next/link';
 import { WorkOrderDetailSheet } from '@/components/work-order-detail-sheet';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { BillingBanner } from '@/components/billing-banner';
+import { useShopBilling } from '@/hooks/use-shop-billing';
 
 
 type Availability = "Today" | "2-3 Day Wait" | "One Week Wait" | "Not Taking Orders";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { billing } = useShopBilling(user?.uid);
   const { toast } = useToast();
   
   const [availability, setAvailability] = useState<Availability | undefined>();
@@ -30,7 +33,6 @@ export default function DashboardPage() {
   const [valetService, setValetService] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [hasStripeId, setHasStripeId] = useState(false);
   
   const [recentWorkOrders, setRecentWorkOrders] = useState<WorkOrder[]>([]);
   const [workOrdersLoading, setWorkOrdersLoading] = useState(true);
@@ -53,7 +55,6 @@ export default function DashboardPage() {
           setAvailability(data.availability || 'Today');
           setDropOff(data.drop_off || false);
           setValetService(data.valet_service || false);
-          setHasStripeId(!!data.stripe_customer_id);
         }
         setLoading(false);
     };
@@ -170,7 +171,7 @@ export default function DashboardPage() {
         <div className="flex justify-between items-start">
             <h1 className="text-3xl font-headline font-bold text-primary">Dashboard</h1>
              {loading ? <Skeleton className="h-6 w-32" /> : (
-                hasStripeId ? (
+                billing?.status === 'active' ? (
                 <div className="flex items-center gap-2 text-sm text-green-400">
                     <ShieldCheck className="h-5 w-5" />
                     <span>Billing Active</span>
@@ -179,15 +180,7 @@ export default function DashboardPage() {
             )}
         </div>
 
-      {!loading && !hasStripeId && (
-        <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Action Required: Complete Billing Setup</AlertTitle>
-            <AlertDescription>
-                Your shop is not yet active. Please go to <Link href="/dashboard/settings" className="font-semibold underline hover:text-white">Settings</Link> to set up your payment method via Stripe. You will not be able to receive work orders until this is complete.
-            </AlertDescription>
-        </Alert>
-      )}
+      <BillingBanner billing={billing} />
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         
