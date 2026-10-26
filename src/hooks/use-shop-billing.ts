@@ -10,6 +10,8 @@ export type ShopBillingView = {
   promoCode: string | null;
   graceUntil: string | null;
   openInvoiceUrl: string | null;
+  approved: boolean;
+  termsVersion: string | null;
   ticketsThisMonth: number;
   freeThisMonth: number;
 };
@@ -36,6 +38,8 @@ export function useShopBilling(shopId: string | undefined) {
       promoCode: row?.promo_code ?? null,
       graceUntil: row?.grace_until ?? null,
       openInvoiceUrl: row?.open_invoice_url ?? null,
+      approved: !!row?.approved_at,
+      termsVersion: row?.terms_version ?? null,
       ticketsThisMonth: tickets?.length ?? 0,
       freeThisMonth: tickets?.filter((t) => t.free).length ?? 0,
     });

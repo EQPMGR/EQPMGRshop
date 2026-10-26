@@ -15,6 +15,8 @@ import { db } from '@/lib/supabase';
 export const SERVICE_TICKET_LOOKUP_KEY = 'service_ticket_cad';
 export const RENTAL_TICKET_LOOKUP_KEY = 'rental_ticket_cad';
 export const GRACE_DAYS = 5;
+export { BILLING_TERMS_VERSION } from '@/lib/billing-terms';
+import { BILLING_TERMS_VERSION } from '@/lib/billing-terms';
 
 let client: Stripe | null = null;
 export function stripe(): Stripe {
@@ -42,6 +44,9 @@ export type ShopBilling = {
   promo_code: string | null;
   grace_until: string | null;
   open_invoice_url: string | null;
+  approved_at: string | null;
+  terms_accepted_at: string | null;
+  terms_version: string | null;
 };
 
 export async function getShopBilling(shopId: string): Promise<ShopBilling> {
@@ -49,6 +54,10 @@ export async function getShopBilling(shopId: string): Promise<ShopBilling> {
   const { data, error } = await db.from('shop_billing').select('*').eq('shop_id', shopId).single();
   if (error) throw error;
   return data as ShopBilling;
+}
+
+export async function recordTermsAccepted(shopId: string) {
+  await updateShopBilling(shopId, { terms_accepted_at: new Date().toISOString(), terms_version: BILLING_TERMS_VERSION });
 }
 
 async function updateShopBilling(shopId: string, values: Partial<ShopBilling>) {

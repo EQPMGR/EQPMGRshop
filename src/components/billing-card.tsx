@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useShopBilling } from '@/hooks/use-shop-billing';
 import { getAccessToken } from '@/lib/client-auth';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BILLING_TERMS, BILLING_TERMS_VERSION } from '@/lib/billing-terms';
 
 const STATUS_LABEL = {
   setup_needed: 'Payment method needed',
@@ -32,6 +34,7 @@ export function BillingCard({ shopId }: { shopId: string }) {
   const { billing, loading, reload } = useShopBilling(shopId);
   const [busy, setBusy] = useState<'setup' | 'portal' | 'promo' | null>(null);
   const [code, setCode] = useState('');
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   // Back from Stripe after adding a card: the webhook may take a moment.
   useEffect(() => {
@@ -44,7 +47,7 @@ export function BillingCard({ shopId }: { shopId: string }) {
   async function go(kind: 'setup' | 'portal') {
     setBusy(kind);
     try {
-      const { url } = await post(`/api/billing/${kind}`);
+      const { url } = await post(`/api/billing/${kind}`, kind === 'setup' ? { acceptTerms } : undefined);
       window.location.href = url;
     } catch (error: any) {
       toast({ title: 'Billing', description: error.message, variant: 'destructive' });
@@ -71,9 +74,7 @@ export function BillingCard({ shopId }: { shopId: string }) {
       <CardHeader>
         <CardTitle className="font-headline text-primary">Billing</CardTitle>
         <CardDescription>
-          Each work order a rider sends you is a <b>C$2 Service Ticket</b> (repairs and bike fits alike), plus applicable tax.
-          No monthly fee, minimum or setup fee. On the 1st of each month, your card is charged once for the previous month&apos;s tickets.
-          If a payment fails, you have 5 days to fix it before new work orders pause.
+          C$2 per Service Ticket (one per work order), billed monthly. No monthly fee, minimum or setup fee.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -99,9 +100,26 @@ export function BillingCard({ shopId }: { shopId: string }) {
               </div>
             </div>
 
+            {!billing.approved && (
+              <p className="text-sm text-amber-400">Your shop is waiting for approval by EQPMGR. Riders will find you once it&apos;s approved and a card is on file.</p>
+            )}
+
+            {billing.termsVersion !== BILLING_TERMS_VERSION && (
+              <div className="space-y-2 rounded-lg border border-border p-3 text-sm">
+                <p className="font-semibold">Billing terms</p>
+                <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                  {BILLING_TERMS.map((term) => <li key={term}>{term}</li>)}
+                </ul>
+                <label className="flex items-center gap-2 pt-1">
+                  <Checkbox checked={acceptTerms} onCheckedChange={(v) => setAcceptTerms(v === true)} />
+                  I agree to these billing terms on behalf of my shop.
+                </label>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2">
               {billing.status === 'setup_needed' || !billing.hasCustomer ? (
-                <Button onClick={() => go('setup')} disabled={!!busy}>
+                <Button onClick={() => go('setup')} disabled={!!busy || (billing.termsVersion !== BILLING_TERMS_VERSION && !acceptTerms)}>
                   {busy === 'setup' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add payment method
                 </Button>
               ) : (
@@ -110,7 +128,7 @@ export function BillingCard({ shopId }: { shopId: string }) {
                     {busy === 'portal' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Manage billing &amp; invoices
                   </Button>
                   {(billing.status === 'past_due' || billing.status === 'paused') && (
-                    <Button variant="outline" onClick={() => go('setup')} disabled={!!busy}>Use a different card</Button>
+                    <Button variant="outline" onClick={() => go('setup')} disabled={!!busy || (billing.termsVersion !== BILLING_TERMS_VERSION && !acceptTerms)}>Use a different card</Button>
                   )}
                   {billing.openInvoiceUrl && (
                     <Button variant="outline" asChild><a href={billing.openInvoiceUrl} target="_blank" rel="noreferrer">Pay unpaid invoice</a></Button>
