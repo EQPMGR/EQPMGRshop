@@ -9,7 +9,7 @@ import 'server-only';
 // billing_tickets row per work order (migration 020), and runBilling() turns
 // unbilled tickets into one Stripe invoice per shop. Stripe never counts usage.
 import Stripe from 'stripe';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, timingSafeEqual } from 'crypto';
 import { db } from '@/lib/supabase';
 
 export const SERVICE_TICKET_LOOKUP_KEY = 'service_ticket_cad';
@@ -231,7 +231,9 @@ export async function runBilling() {
         automatic_tax: { enabled: process.env.STRIPE_TAX_ENABLED === '1' },
         description: `EQPMGR tickets for ${period}`,
         metadata: { shop_id: shopId, period: periodKey },
-      }, { idempotencyKey: `invoice-${shopId}-${periodKey}` });
+      // Keyed on the exact tickets: a retry of the same batch reuses the invoice,
+      // but a later batch for the same shop and month gets a new one.
+      }, { idempotencyKey: `invoice-${shopId}-${periodKey}-${ticketBatchKey(shopTickets)}` });
 
       for (const kind of ['service', 'rental'] as const) {
         const price = priceFor(kind);
@@ -269,6 +271,10 @@ export async function runBilling() {
     }
   }
   return summary;
+}
+
+function ticketBatchKey(tickets: Ticket[]) {
+  return createHash('sha256').update(tickets.map((t) => t.id).sort().join(',')).digest('hex').slice(0, 16);
 }
 
 async function markBilled(tickets: Ticket[], invoiceId: string) {
