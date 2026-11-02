@@ -7,7 +7,8 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 
-import { db } from '@/lib/supabase';
+import { getAccessToken } from '@/lib/client-auth';
+import { saveBikeFitAction } from '@/app/dashboard/equipment/admin-actions';
 import type { Equipment, BikeFitData, CleatPosition } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -118,17 +119,16 @@ export function BikeFitDialog({ children, equipment, userId, onSuccess }: BikeFi
           }
       }
 
-      const { error } = await db
-        .from('equipment')
-        .update({
-          fit_data: cleanedData,
-        })
-        .eq('id', equipment.id)
-        .eq('user_id', userId);
+      // Shops can't write a customer's bike directly (RLS), so this goes
+      // through a server action that checks for an open work order.
+      const result = await saveBikeFitAction({
+        accessToken: await getAccessToken(),
+        equipmentId: equipment.id,
+        fitData: cleanedData,
+      });
+      if (!result.success) throw new Error(result.message);
 
-      if (error) throw error;
-
-      toast({ title: 'Bike Fit Saved!', description: "Client's measurements have been updated." });
+      toast({ title: 'Bike Fit Saved!', description: result.message });
       onSuccess();
       handleOpenChange(false);
     } catch (error: any) {

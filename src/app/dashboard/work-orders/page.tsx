@@ -8,7 +8,7 @@ import { db } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Sparkles, Loader2 } from "lucide-react";
+import { MoreHorizontal, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,12 +31,6 @@ import { WorkOrderDetailSheet } from "@/components/work-order-detail-sheet";
 
 import type { WorkOrder, WorkOrderStatus } from '@/lib/types';
 import { allStatuses, statusVariant } from '@/lib/types';
-
-const priorityVariant: { [key in NonNullable<WorkOrder['priority']>]: "default" | "secondary" | "destructive" } = {
-  "Low": "secondary",
-  "Medium": "secondary",
-  "High": "destructive"
-};
 
 export default function WorkOrdersPage() {
   const { user } = useAuth();
@@ -131,17 +125,6 @@ export default function WorkOrdersPage() {
     };
   }, [user, toast]);
 
-  const handleGetPriority = (id: string) => {
-    setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, priorityLoading: true } : wo));
-    
-    // Simulate AI call
-    setTimeout(() => {
-        const priorities: Array<WorkOrder['priority']> = ["Low", "Medium", "High"];
-        const randomPriority = priorities[Math.floor(Math.random() * priorities.length)];
-        setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, priority: randomPriority, priorityLoading: false } : wo));
-    }, 1500);
-  };
-  
   const handleViewDetails = (order: WorkOrder) => {
     setSelectedWorkOrder(order);
     setIsSheetOpen(true);
@@ -159,12 +142,19 @@ export default function WorkOrdersPage() {
     setUpdatingStatus(true);
 
     try {
-      const { error } = await db
+      const { data, error } = await db
         .from('work_orders')
         .update({ status: statusToUpdate })
-        .eq('id', selectedWorkOrder.id);
+        .eq('id', selectedWorkOrder.id)
+        .select('id');
 
       if (error) throw error;
+      // RLS turns a blocked update into "0 rows" with no error.
+      if (!data?.length) throw new Error("This work order couldn't be updated.");
+
+      // Show the new status right away (realtime updates aren't guaranteed).
+      const id = selectedWorkOrder.id;
+      setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, status: statusToUpdate } : wo));
 
       toast({ title: "Success", description: "Work order status updated." });
       setIsStatusDialogOpen(false);
@@ -180,10 +170,6 @@ export default function WorkOrdersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-headline font-bold text-primary">Work Orders</h1>
-        <Button className="bg-accent hover:bg-accent/90">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Work Order
-        </Button>
       </div>
       
       <div className="rounded-lg border">
@@ -205,7 +191,6 @@ export default function WorkOrdersPage() {
                 <TableHead>Issue</TableHead>
                 <TableHead>Received</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>AI Priority</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -218,20 +203,6 @@ export default function WorkOrdersPage() {
                   <TableCell>{order.createdAt}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant[order.status]}>{order.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    {order.priority ? (
-                      <Badge variant={priorityVariant[order.priority]}>{order.priority}</Badge>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => handleGetPriority(order.id)} disabled={order.priorityLoading}>
-                        {order.priorityLoading ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Sparkles className="mr-2 h-4 w-4 text-accent" />
-                        )}
-                        Get Priority
-                      </Button>
-                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -247,7 +218,6 @@ export default function WorkOrdersPage() {
                             View Details
                         </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => handleOpenStatusDialog(order)}>Update Status</DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-500">Cancel Order</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
