@@ -9,12 +9,14 @@ import 'server-only';
 // billing_tickets row per work order (migration 020), and runBilling() turns
 // unbilled tickets into one Stripe invoice per shop. Stripe never counts usage.
 import Stripe from 'stripe';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, timingSafeEqual } from 'crypto';
 import { db } from '@/lib/supabase';
 
 export const SERVICE_TICKET_LOOKUP_KEY = 'service_ticket_cad';
 export const RENTAL_TICKET_LOOKUP_KEY = 'rental_ticket_cad';
 export const GRACE_DAYS = 5;
+export { BILLING_TERMS_VERSION } from '@/lib/billing-terms';
+import { BILLING_TERMS_VERSION } from '@/lib/billing-terms';
 
 let client: Stripe | null = null;
 export function stripe(): Stripe {
@@ -42,6 +44,9 @@ export type ShopBilling = {
   promo_code: string | null;
   grace_until: string | null;
   open_invoice_url: string | null;
+  approved_at: string | null;
+  terms_accepted_at: string | null;
+  terms_version: string | null;
 };
 
 export async function getShopBilling(shopId: string): Promise<ShopBilling> {
@@ -49,6 +54,10 @@ export async function getShopBilling(shopId: string): Promise<ShopBilling> {
   const { data, error } = await db.from('shop_billing').select('*').eq('shop_id', shopId).single();
   if (error) throw error;
   return data as ShopBilling;
+}
+
+export async function recordTermsAccepted(shopId: string) {
+  await updateShopBilling(shopId, { terms_accepted_at: new Date().toISOString(), terms_version: BILLING_TERMS_VERSION });
 }
 
 async function updateShopBilling(shopId: string, values: Partial<ShopBilling>) {
@@ -231,7 +240,9 @@ export async function runBilling() {
         automatic_tax: { enabled: process.env.STRIPE_TAX_ENABLED === '1' },
         description: `EQPMGR tickets for ${period}`,
         metadata: { shop_id: shopId, period: periodKey },
-      }, { idempotencyKey: `invoice-${shopId}-${periodKey}` });
+      // Keyed on the exact tickets: a retry of the same batch reuses the invoice,
+      // but a later batch for the same shop and month gets a new one.
+      }, { idempotencyKey: `invoice-${shopId}-${periodKey}-${ticketBatchKey(shopTickets)}` });
 
       for (const kind of ['service', 'rental'] as const) {
         const price = priceFor(kind);
@@ -269,6 +280,10 @@ export async function runBilling() {
     }
   }
   return summary;
+}
+
+function ticketBatchKey(tickets: Ticket[]) {
+  return createHash('sha256').update(tickets.map((t) => t.id).sort().join(',')).digest('hex').slice(0, 16);
 }
 
 async function markBilled(tickets: Ticket[], invoiceId: string) {

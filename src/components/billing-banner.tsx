@@ -1,13 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Clock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { ShopBillingView } from '@/hooks/use-shop-billing';
 
 /** Dashboard notice when billing needs the shop's attention. */
 export function BillingBanner({ billing }: { billing: ShopBillingView | null }) {
-  if (!billing || billing.status === 'active') return null;
+  if (!billing) return null;
+  const pendingApproval = !billing.approved ? (
+    <Alert>
+      <Clock className="h-4 w-4" />
+      <AlertTitle>Waiting for approval</AlertTitle>
+      <AlertDescription>
+        EQPMGR reviews every new shop before riders can find it. We&apos;ll approve your shop shortly
+        {billing.status === 'setup_needed' ? '; meanwhile, add a payment method in Settings so you’re ready to go.' : '.'}
+      </AlertDescription>
+    </Alert>
+  ) : null;
+  if (billing.status === 'active') return pendingApproval;
+  if (pendingApproval && billing.status === 'setup_needed') return pendingApproval;
 
   if (billing.status === 'setup_needed') {
     return (
@@ -15,7 +27,7 @@ export function BillingBanner({ billing }: { billing: ShopBillingView | null }) 
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>Add a payment method</AlertTitle>
         <AlertDescription>
-          Each work order you receive is a C$2 Service Ticket, billed monthly. Add a card in{' '}
+          Riders can't find your shop until a card is on file. Each work order you receive is a C$2 Service Ticket, billed monthly. Add a card in{' '}
           <Link href="/dashboard/settings" className="font-semibold underline hover:text-white">Settings</Link>
           {billing.freeTicketsRemaining > 0 ? ` (you have ${billing.freeTicketsRemaining} free tickets).` : '.'}
         </AlertDescription>

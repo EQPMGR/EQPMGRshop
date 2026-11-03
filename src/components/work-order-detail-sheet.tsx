@@ -29,6 +29,12 @@ interface WorkOrderDetailSheetProps {
   workOrder: WorkOrder | null;
 }
 
+function fitDataFromRow(value: unknown): any {
+  if (Array.isArray(value)) return value.map(fitDataFromRow);
+  if (!value || typeof value !== 'object') return value ?? undefined;
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()), fitDataFromRow(v)]));
+}
+
 export function WorkOrderDetailSheet({
   isOpen,
   onOpenChange,
@@ -57,7 +63,9 @@ export function WorkOrderDetailSheet({
             });
             setEquipment(null);
           } else {
-            setEquipment(data as Equipment);
+            // The row is snake_case; the fit dialog reads fitData. The rider app
+            // stores fit keys snake_case, the shop camelCase: accept both.
+            setEquipment({ ...data, fitData: fitDataFromRow(data.fit_data) } as Equipment);
           }
         } catch (error) {
           console.error("Error fetching equipment:", error);
@@ -96,6 +104,7 @@ export function WorkOrderDetailSheet({
     "Testing": "secondary",
     "Bike Ready": "outline",
     "Completed": "outline",
+    "Cancelled": "outline",
   };
 
   const handleFitDataSuccess = () => {

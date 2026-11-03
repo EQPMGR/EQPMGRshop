@@ -187,3 +187,57 @@ export async function recordChainStretchAction({
     return { success: false, message: (error as Error).message || 'Could not record the measurement.' };
   }
 }
+
+// Bike fit fields a shop may save. Anything else is dropped.
+const FIT_NUMBER_FIELDS = [
+  'saddleHeight', 'saddleHeightOverBars', 'saddleToHandlebarReach', 'saddleAngle', 'saddleForeAft',
+  'stemLength', 'stemAngle', 'handlebarWidth', 'handlebarAngle', 'handlebarExtension', 'crankLength',
+] as const;
+const FIT_TEXT_FIELDS = ['saddleBrandModel', 'handlebarBrandModel', 'brakeLeverPosition'] as const;
+const CLEAT_FIELDS = ['foreAft', 'lateral', 'rotational'] as const;
+
+const finiteNumber = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
+export async function saveBikeFitAction({
+  accessToken,
+  equipmentId,
+  fitData,
+}: {
+  accessToken: string;
+  equipmentId: string;
+  fitData: Record<string, unknown>;
+}): Promise<{ success: boolean; message: string }> {
+  try {
+    const shop = await verifyShopToken(accessToken);
+    await requireOpenWorkOrder(shop.uid, equipmentId);
+
+    // Stored camelCase in equipment.fit_data, the shape the rider app reads.
+    const clean: Record<string, unknown> = {};
+    for (const key of FIT_NUMBER_FIELDS) {
+      const n = finiteNumber(fitData?.[key]);
+      if (n !== undefined) clean[key] = n;
+    }
+    for (const key of FIT_TEXT_FIELDS) {
+      const s = fitData?.[key];
+      if (typeof s === 'string' && s.trim()) clean[key] = s.trim().slice(0, 200);
+    }
+    clean.hasAeroBars = fitData?.hasAeroBars === true;
+    const cleat = fitData?.cleatPosition as Record<string, unknown> | undefined;
+    if (cleat && typeof cleat === 'object') {
+      const c: Record<string, number> = {};
+      for (const key of CLEAT_FIELDS) {
+        const n = finiteNumber(cleat[key]);
+        if (n !== undefined) c[key] = n;
+      }
+      if (Object.keys(c).length) clean.cleatPosition = c;
+    }
+
+    const { data, error } = await db.from('equipment').update({ fit_data: clean }).eq('id', equipmentId).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('Bike not found.');
+    return { success: true, message: "Client's measurements have been updated." };
+  } catch (error) {
+    console.error('[SERVER ACTION ERROR] in saveBikeFitAction:', error);
+    return { success: false, message: (error as Error).message || 'Could not save the bike fit.' };
+  }
+}
