@@ -22,11 +22,14 @@ import { db } from '@/lib/supabase';
 import type { Equipment } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { printWorkOrder } from '@/lib/print-work-order';
+import { UpdateStatusDialog } from './update-status-dialog';
 
 interface WorkOrderDetailSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   workOrder: WorkOrder | null;
+  onStatusUpdated: (workOrderId: string, status: WorkOrderStatus) => void;
 }
 
 function fitDataFromRow(value: unknown): any {
@@ -39,9 +42,11 @@ export function WorkOrderDetailSheet({
   isOpen,
   onOpenChange,
   workOrder,
+  onStatusUpdated,
 }: WorkOrderDetailSheetProps) {
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [loadingEquipment, setLoadingEquipment] = useState(false);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchEquipmentData = async () => {
@@ -218,10 +223,16 @@ export function WorkOrderDetailSheet({
         </div>
         <SheetFooter>
             <div className="w-full flex justify-end gap-2">
-                 <Button variant="outline">Print Work Order</Button>
-                 <Button className="bg-accent hover:bg-accent/90">Update Status</Button>
+                 <Button variant="outline" onClick={() => printWorkOrder(workOrder)}>Print Work Order</Button>
+                 <Button className="bg-accent hover:bg-accent/90" onClick={() => setIsStatusDialogOpen(true)}>Update Status</Button>
             </div>
         </SheetFooter>
+        <UpdateStatusDialog
+            open={isStatusDialogOpen}
+            onOpenChange={setIsStatusDialogOpen}
+            workOrder={workOrder}
+            onUpdated={onStatusUpdated}
+        />
       </SheetContent>
     </Sheet>
   );

@@ -305,6 +305,10 @@ export default function DashboardPage() {
             isOpen={isSheetOpen}
             onOpenChange={setIsSheetOpen}
             workOrder={selectedWorkOrder}
+            onStatusUpdated={(id, status) => {
+              setRecentWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, status } : wo));
+              setSelectedWorkOrder(prev => prev?.id === id ? { ...prev, status } : prev);
+            }}
         />
       )}
     </div>
