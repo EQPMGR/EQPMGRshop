@@ -16,18 +16,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { WorkOrderDetailSheet } from "@/components/work-order-detail-sheet";
+import { UpdateStatusDialog } from "@/components/update-status-dialog";
 
 import type { WorkOrder, WorkOrderStatus } from '@/lib/types';
 import { allStatuses, statusVariant } from '@/lib/types';
@@ -40,8 +31,6 @@ export default function WorkOrdersPage() {
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
-  const [statusToUpdate, setStatusToUpdate] = useState<WorkOrderStatus | null>(null);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -132,38 +121,12 @@ export default function WorkOrdersPage() {
   
   const handleOpenStatusDialog = (order: WorkOrder) => {
       setSelectedWorkOrder(order);
-      setStatusToUpdate(order.status);
       setIsStatusDialogOpen(true);
   }
 
-  const handleUpdateStatus = async () => {
-    if (!selectedWorkOrder || !statusToUpdate) return;
-
-    setUpdatingStatus(true);
-
-    try {
-      const { data, error } = await db
-        .from('work_orders')
-        .update({ status: statusToUpdate })
-        .eq('id', selectedWorkOrder.id)
-        .select('id');
-
-      if (error) throw error;
-      // RLS turns a blocked update into "0 rows" with no error.
-      if (!data?.length) throw new Error("This work order couldn't be updated.");
-
-      // Show the new status right away (realtime updates aren't guaranteed).
-      const id = selectedWorkOrder.id;
-      setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, status: statusToUpdate } : wo));
-
-      toast({ title: "Success", description: "Work order status updated." });
-      setIsStatusDialogOpen(false);
-      setSelectedWorkOrder(null);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to update status.", variant: "destructive" });
-    } finally {
-      setUpdatingStatus(false);
-    }
+  const handleStatusUpdated = (id: string, status: WorkOrderStatus) => {
+    setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, status } : wo));
+    setSelectedWorkOrder(prev => prev?.id === id ? { ...prev, status } : prev);
   }
 
   return (
@@ -228,41 +191,19 @@ export default function WorkOrdersPage() {
         )}
       </div>
 
-      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Update Status</DialogTitle>
-                <DialogDescription>
-                    Select the new status for work order #{selectedWorkOrder?.id.substring(0, 7)}.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-                <Label htmlFor="status-select">Status</Label>
-                <Select value={statusToUpdate ?? undefined} onValueChange={(value: WorkOrderStatus) => setStatusToUpdate(value)}>
-                    <SelectTrigger id="status-select">
-                        <SelectValue placeholder="Select a status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {allStatuses.map(status => (
-                            <SelectItem key={status} value={status}>{status}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleUpdateStatus} disabled={updatingStatus} className="bg-accent hover:bg-accent/90">
-                    {updatingStatus ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Saving...</> : 'Save'}
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <UpdateStatusDialog
+        open={isStatusDialogOpen}
+        onOpenChange={setIsStatusDialogOpen}
+        workOrder={selectedWorkOrder}
+        onUpdated={handleStatusUpdated}
+      />
 
       {selectedWorkOrder && (
         <WorkOrderDetailSheet
             isOpen={isSheetOpen}
             onOpenChange={setIsSheetOpen}
             workOrder={selectedWorkOrder}
+            onStatusUpdated={handleStatusUpdated}
         />
       )}
     </div>

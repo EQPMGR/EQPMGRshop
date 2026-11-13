@@ -22,11 +22,16 @@ import { db } from '@/lib/supabase';
 import type { Equipment } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { printWorkOrder } from '@/lib/print-work-order';
+import { UpdateStatusDialog } from './update-status-dialog';
+import { getAccessToken } from '@/lib/client-auth';
+import { addWorkOrderNoteAction, getWorkOrderNotesAction, type WorkOrderNote } from '@/app/dashboard/work-orders/actions';
 
 interface WorkOrderDetailSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   workOrder: WorkOrder | null;
+  onStatusUpdated: (workOrderId: string, status: WorkOrderStatus) => void;
 }
 
 function fitDataFromRow(value: unknown): any {
@@ -39,9 +44,14 @@ export function WorkOrderDetailSheet({
   isOpen,
   onOpenChange,
   workOrder,
+  onStatusUpdated,
 }: WorkOrderDetailSheetProps) {
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [loadingEquipment, setLoadingEquipment] = useState(false);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [notes, setNotes] = useState<WorkOrderNote[]>([]);
+  const [noteText, setNoteText] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
   const { toast } = useToast();
 
   const fetchEquipmentData = async () => {
@@ -87,6 +97,43 @@ export function WorkOrderDetailSheet({
     fetchEquipmentData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, workOrder, toast]);
+
+  const workOrderId = workOrder?.id;
+  useEffect(() => {
+    setNotes([]);
+    setNoteText('');
+    if (!isOpen || !workOrderId) return;
+
+    let stale = false;
+    (async () => {
+      const result = await getWorkOrderNotesAction({ accessToken: await getAccessToken(), workOrderId });
+      if (stale) return;
+      if (result.success) {
+        setNotes(result.notes);
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: result.message });
+      }
+    })().catch(() => {
+      if (!stale) toast({ variant: 'destructive', title: 'Error', description: 'Could not load the notes.' });
+    });
+    return () => { stale = true; };
+  }, [isOpen, workOrderId, toast]);
+
+  const handleAddNote = async () => {
+    if (!workOrderId || !noteText.trim()) return;
+    setSavingNote(true);
+    try {
+      const result = await addWorkOrderNoteAction({ accessToken: await getAccessToken(), workOrderId, body: noteText });
+      if (!result.success || !result.note) throw new Error(result.message);
+      const added = result.note;
+      setNotes(prev => [added, ...prev]);
+      setNoteText('');
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not save the note.' });
+    } finally {
+      setSavingNote(false);
+    }
+  };
 
 
   if (!workOrder) {
@@ -210,18 +257,47 @@ export function WorkOrderDetailSheet({
              <h3 className="font-semibold text-foreground">Internal Shop Notes</h3>
               <div className="grid w-full gap-1.5">
                 <Label htmlFor="message">Add notes for your team</Label>
-                <Textarea placeholder="e.g., 'Ordered part XYZ, expecting arrival on Friday.'" id="message" />
-                <Button size="sm" className="w-fit self-end bg-accent hover:bg-accent/90">Add Note</Button>
+                <Textarea
+                  placeholder="e.g., 'Ordered part XYZ, expecting arrival on Friday.'"
+                  id="message"
+                  maxLength={2000}
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                />
+                <Button
+                  size="sm"
+                  className="w-fit self-end bg-accent hover:bg-accent/90"
+                  onClick={handleAddNote}
+                  disabled={savingNote || !noteText.trim()}
+                >
+                  {savingNote ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Add Note'}
+                </Button>
             </div>
+            {notes.length > 0 && (
+              <div className="space-y-2 pt-2">
+                {notes.map((note) => (
+                  <div key={note.id} className="rounded-md border p-3 text-sm">
+                    <p className="text-xs text-muted-foreground">{new Date(note.createdAt).toLocaleString()}</p>
+                    <p className="whitespace-pre-wrap break-words text-foreground">{note.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
         </div>
         <SheetFooter>
             <div className="w-full flex justify-end gap-2">
-                 <Button variant="outline">Print Work Order</Button>
-                 <Button className="bg-accent hover:bg-accent/90">Update Status</Button>
+                 <Button variant="outline" onClick={() => printWorkOrder(workOrder)}>Print Work Order</Button>
+                 <Button className="bg-accent hover:bg-accent/90" onClick={() => setIsStatusDialogOpen(true)}>Update Status</Button>
             </div>
         </SheetFooter>
+        <UpdateStatusDialog
+            open={isStatusDialogOpen}
+            onOpenChange={setIsStatusDialogOpen}
+            workOrder={workOrder}
+            onUpdated={onStatusUpdated}
+        />
       </SheetContent>
     </Sheet>
   );
