@@ -19,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BillingBanner } from '@/components/billing-banner';
 import { useShopBilling } from '@/hooks/use-shop-billing';
+import { GettingStartedCard, shopSteps, useChecklistHidden } from '@/components/getting-started-card';
 
 
 type Availability = "Today" | "2-3 Day Wait" | "One Week Wait" | "Not Taking Orders";
@@ -26,6 +27,7 @@ type Availability = "Today" | "2-3 Day Wait" | "One Week Wait" | "Not Taking Ord
 export default function DashboardPage() {
   const { user } = useAuth();
   const { billing } = useShopBilling(user?.uid);
+  const checklist = useChecklistHidden();
   const { toast } = useToast();
   
   const [availability, setAvailability] = useState<Availability | undefined>();
@@ -161,6 +163,9 @@ export default function DashboardPage() {
     }
   };
 
+  const allSteps = billing && !workOrdersLoading ? shopSteps(billing, recentWorkOrders.length > 0) : null;
+  const checklistSteps = allSteps && !checklist.hidden && allSteps.some((s) => !s.done) ? allSteps : null;
+
   const handleViewDetails = (order: WorkOrder) => {
     setSelectedWorkOrder(order);
     setIsSheetOpen(true);
@@ -180,7 +185,9 @@ export default function DashboardPage() {
             )}
         </div>
 
-      <BillingBanner billing={billing} />
+      {checklistSteps && <GettingStartedCard steps={checklistSteps} onHide={checklist.hide} />}
+      {/* The checklist already covers "add a card" and "waiting for approval"; payment problems still get the banner. */}
+      {(!checklistSteps || billing?.status === 'past_due' || billing?.status === 'paused') && <BillingBanner billing={billing} />}
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         
