@@ -16,7 +16,8 @@ export async function POST(request: Request) {
   let shop;
   try {
     shop = await verifyShopToken(header.startsWith('Bearer ') ? header.slice(7) : null);
-  } catch {
+  } catch (error: any) {
+    console.error('[notify/new-shop] auth', error?.message);
     return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
   }
 
