@@ -1,6 +1,7 @@
 
 'use client';
 
+import { getAccessToken } from '@/lib/client-auth';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
@@ -170,6 +171,12 @@ export default function OnboardingPage() {
               }, { onConflict: 'id' });
 
             if (providerError) throw providerError;
+
+            // Let EQPMGR know a new shop is waiting for approval (one email per
+            // shop, sent from the server). Never blocks or fails the signup.
+            getAccessToken()
+              .then((token) => fetch('/api/notify/new-shop', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }))
+              .catch(() => {});
 
             toast({
                 title: "Shop Information Saved!",
