@@ -222,6 +222,8 @@ export async function saveBikeFitAction({
       if (typeof s === 'string' && s.trim()) clean[key] = s.trim().slice(0, 200);
     }
     clean.hasAeroBars = fitData?.hasAeroBars === true;
+    // Display unit only; lengths arrive already converted to mm.
+    clean.units = fitData?.units === 'imperial' ? 'imperial' : 'metric';
     const cleat = fitData?.cleatPosition as Record<string, unknown> | undefined;
     if (cleat && typeof cleat === 'object') {
       const c: Record<string, number> = {};

@@ -72,6 +72,8 @@ export interface CleatPosition {
 }
   
 export interface BikeFitData {
+    /** Unit the fit was entered in; lengths are always stored in mm. */
+    units?: 'metric' | 'imperial';
     saddleHeight?: number;
     saddleHeightOverBars?: number;
     saddleToHandlebarReach?: number;

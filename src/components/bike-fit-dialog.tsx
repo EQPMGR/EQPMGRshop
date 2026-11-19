@@ -35,6 +35,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from './ui/separator';
 import { BikeFitDiagram } from './icons/bike-fit-diagram';
+import { convertLengths, fitForForm, fitForStorage, type FitUnits } from '@/lib/fit-units';
 
 const cleatPositionSchema = z.object({
   foreAft: z.coerce.number().optional(),
@@ -74,19 +75,20 @@ interface BikeFitDialogProps {
 export function BikeFitDialog({ children, equipment, userId, onSuccess }: BikeFitDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [units, setUnits] = useState<'metric' | 'imperial'>('metric');
+  // Lengths are stored in mm; the form shows them in the unit last used for this bike.
+  const [units, setUnits] = useState<FitUnits>(() => fitForForm(equipment.fitData as any).units);
   const { toast } = useToast();
 
   const form = useForm<FitFormValues>({
     resolver: zodResolver(fitFormSchema),
-    defaultValues: equipment.fitData || {
-      hasAeroBars: false,
-    },
+    defaultValues: { hasAeroBars: false, ...fitForForm(equipment.fitData as any).values },
   });
   
   useEffect(() => {
       if (open && equipment.fitData) {
-          form.reset(equipment.fitData);
+          const { values, units: savedUnits } = fitForForm(equipment.fitData as any);
+          form.reset({ hasAeroBars: false, ...values });
+          setUnits(savedUnits);
       }
   }, [open, equipment.fitData, form]);
 
@@ -95,7 +97,9 @@ export function BikeFitDialog({ children, equipment, userId, onSuccess }: BikeFi
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (!isOpen) {
-      form.reset(equipment.fitData || { hasAeroBars: false });
+      const { values, units: savedUnits } = fitForForm(equipment.fitData as any);
+      form.reset({ hasAeroBars: false, ...values });
+      setUnits(savedUnits);
     }
   };
 
@@ -124,7 +128,8 @@ export function BikeFitDialog({ children, equipment, userId, onSuccess }: BikeFi
       const result = await saveBikeFitAction({
         accessToken: await getAccessToken(),
         equipmentId: equipment.id,
-        fitData: cleanedData,
+        // Store in mm, plus the unit used, whatever the form showed.
+        fitData: fitForStorage(cleanedData as Record<string, unknown>, units),
       });
       if (!result.success) throw new Error(result.message);
 
@@ -216,7 +221,11 @@ export function BikeFitDialog({ children, equipment, userId, onSuccess }: BikeFi
                        
                         <RadioGroup
                             value={units}
-                            onValueChange={(value: 'metric' | 'imperial') => setUnits(value)}
+                            onValueChange={(value: FitUnits) => {
+                                // Convert what's already typed, so the numbers follow the switch.
+                                form.reset(convertLengths(form.getValues() as Record<string, unknown>, units, value) as FitFormValues, { keepDefaultValues: true });
+                                setUnits(value);
+                            }}
                             className="flex space-x-4"
                         >
                             <FormItem className="flex items-center space-x-2 space-y-0">
