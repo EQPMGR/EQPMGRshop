@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
+import { auth } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,12 +18,33 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const { login } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
+  const handleReset = async () => {
+    setError(null);
+    setNotice(null);
+    setLoading(true);
+    try {
+      const { error: resetError } = await auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: new URL('/reset-password', window.location.origin).toString(),
+      });
+      if (resetError) throw resetError;
+      // Same message either way, so the form can't reveal who has an account.
+      setNotice('If an account exists for that email, a reset link is on its way. Check your inbox (and spam folder).');
+    } catch (err: any) {
+      setError(err.message || 'Could not send the reset link. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (resetMode) return handleReset();
     setError(null);
     setLoading(true);
     try {
@@ -57,7 +79,11 @@ export default function LoginPage() {
               </g>
             </svg>
           </div>
-          <CardDescription>Welcome back! Please login to your account.</CardDescription>
+          <CardDescription>
+            {resetMode
+              ? "Enter your login email and we'll send you a link to choose a new password."
+              : 'Welcome back! Please login to your account.'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -72,16 +98,34 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                required 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+            {!resetMode && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <button
+                    type="button"
+                    onClick={() => { setResetMode(true); setError(null); setNotice(null); }}
+                    className="text-sm underline text-accent"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            )}
+            {notice && (
+              <Alert>
+                <AlertTitle>Check your email</AlertTitle>
+                <AlertDescription>{notice}</AlertDescription>
+              </Alert>
+            )}
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -90,9 +134,16 @@ export default function LoginPage() {
               </Alert>
             )}
             <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={loading}>
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? 'Please wait...' : resetMode ? 'Send reset link' : 'Login'}
             </Button>
           </form>
+          {resetMode && (
+            <div className="mt-4 text-center text-sm">
+              <button type="button" onClick={() => { setResetMode(false); setError(null); setNotice(null); }} className="underline text-accent">
+                Back to login
+              </button>
+            </div>
+          )}
           <div className="mt-4 text-center text-sm">
             Don't have an account?{' '}
             <Link href="/signup" className="underline text-accent">
