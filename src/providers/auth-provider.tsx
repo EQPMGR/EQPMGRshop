@@ -22,6 +22,17 @@ interface AuthContextType {
   logout: () => void;
   onboardingComplete: boolean;
   shopName: string | null;
+  /** Called by the onboarding page once the shop's details are saved. */
+  markOnboarded: (shopName: string) => void;
+}
+
+/**
+ * A shop is set up once its service_providers row has a name and a city
+ * (written by /onboarding). app_users.onboarding_complete isn't used: that row
+ * is shared with the rider app, which can reset it.
+ */
+function isShopSetUp(row: any): boolean {
+  return !!(row && row.shop_name && row.city);
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +42,8 @@ function toAppUser(user: User | null): AppUser | null {
   return {
     uid: user.id,
     email: user.email ?? null,
+    // Without this the onboarding guard never ran, so new shops skipped setup.
+    emailVerified: !!user.email_confirmed_at,
   };
 }
 
@@ -43,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleUserDocSnapshot = useCallback((data: any) => {
     if (data) {
-      setOnboardingComplete(data.onboarding_complete || false);
+      setOnboardingComplete(isShopSetUp(data));
       setShopName(data.shop_name || null);
     } else {
       setOnboardingComplete(false);
@@ -78,30 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
 
       try {
-        // Check if user doc exists and create if not
-        const { data: existingUser } = await db
-          .from('service_providers')
-          .select('*')
-          .eq('id', nextUser.uid)
-          .single();
-
-        if (!existingUser) {
-          await db
-            .from('service_providers')
-            .insert([{
-              id: nextUser.uid,
-              email: nextUser.email,
-              created_at: new Date().toISOString(),
-              onboarding_complete: false,
-            }]);
-        }
-
-        // Fetch current data
+        // The shop row is created by /onboarding; until then there is none.
         const { data: userData, error: fetchError } = await db
           .from('service_providers')
           .select('*')
           .eq('id', nextUser.uid)
-          .single();
+          .maybeSingle();
 
         if (!fetchError && userData) {
           handleUserDocSnapshot(userData);
@@ -229,6 +224,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     onboardingComplete,
     shopName,
+    markOnboarded: (name: string) => {
+      setOnboardingComplete(true);
+      setShopName(name);
+    },
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

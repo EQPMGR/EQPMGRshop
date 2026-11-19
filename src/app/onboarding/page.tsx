@@ -49,7 +49,7 @@ const serviceOptions = [
 
 
 export default function OnboardingPage() {
-    const { user, loading: authLoading, shopName } = useAuth();
+    const { user, loading: authLoading, shopName, markOnboarded, onboardingComplete } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     const [error, setError] = useState<string | null>(null);
@@ -178,6 +178,8 @@ export default function OnboardingPage() {
               .then((token) => fetch('/api/notify/new-shop', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }))
               .catch(() => {});
 
+            markOnboarded(data.shopName);
+
             toast({
                 title: "Shop Information Saved!",
                 description: "Your shop is now set up.",
@@ -192,26 +194,14 @@ export default function OnboardingPage() {
         }
     };
     
-    // Redirect if user is not logged in or has already completed onboarding
+    // Not logged in: to the login page. Already set up (has a shop with a name
+    // and city): to the dashboard. app_users.onboarding_complete is shared with
+    // the rider app and isn't a reliable signal, so it isn't used.
     useEffect(() => {
-        if (!authLoading && user) {
-            const checkOnboarding = async () => {
-                const { data, error } = await db
-                  .from('app_users')
-                  .select('onboarding_complete')
-                  .eq('id', user.uid)
-                  .single();
-
-                if (!error && data?.onboarding_complete) {
-                    router.push('/dashboard');
-                }
-            };
-            checkOnboarding();
-        }
-        if (!authLoading && !user) {
-            router.push('/');
-        }
-    }, [user, authLoading, router]);
+        if (authLoading) return;
+        if (!user) router.push('/');
+        else if (onboardingComplete && !loading) router.push('/dashboard');
+    }, [user, authLoading, onboardingComplete, loading, router]);
 
     if (authLoading || !user) {
         return (
