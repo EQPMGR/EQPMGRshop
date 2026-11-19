@@ -67,18 +67,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let unsubscribeAuth: (() => void) | null = null;
-    let unsubscribeRealtimeChannel: any = null;
+    let realtimeChannel: any = null;
+    // Supabase reports the session more than once on page load (getSession and
+    // INITIAL_SESSION). Only the latest run may apply its results.
+    let run = 0;
+    let currentUid: string | null = null;
 
     const cleanupRealtime = () => {
-      if (unsubscribeRealtimeChannel) {
-        unsubscribeRealtimeChannel.unsubscribe();
-        unsubscribeRealtimeChannel = null;
+      if (realtimeChannel) {
+        // removeChannel (not just unsubscribe) so a new channel with the same
+        // name can be created; reusing a subscribed one throws.
+        db.removeChannel(realtimeChannel);
+        realtimeChannel = null;
       }
     };
 
     const handleAuthState = async (event: string, session: any) => {
-      cleanupRealtime();
       const nextUser = toAppUser(session?.user ?? null);
+
+      // Same shop reported again (duplicate page-load event, token refresh,
+      // tab refocus): keep everything, no reload and no loading flash.
+      if (nextUser && nextUser.uid === currentUid) {
+        setUser(nextUser);
+        return;
+      }
+
+      const myRun = ++run;
+      cleanupRealtime();
+      currentUid = nextUser?.uid ?? null;
       setUser(nextUser);
 
       if (!nextUser) {
@@ -90,22 +106,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setLoading(true);
 
+      // The shop row is created by /onboarding; until then there is none.
+      const { data: userData, error: fetchError } = await db
+        .from('service_providers')
+        .select('*')
+        .eq('id', nextUser.uid)
+        .maybeSingle();
+      if (myRun !== run) return; // a newer run took over
+      if (fetchError) console.warn('AuthProvider shop load failed:', fetchError.message);
+      handleUserDocSnapshot(fetchError ? null : userData);
+
+      // Live updates to the shop row (e.g. after onboarding saves it).
       try {
-        // The shop row is created by /onboarding; until then there is none.
-        const { data: userData, error: fetchError } = await db
-          .from('service_providers')
-          .select('*')
-          .eq('id', nextUser.uid)
-          .maybeSingle();
-
-        if (!fetchError && userData) {
-          handleUserDocSnapshot(userData);
-        } else {
-          handleUserDocSnapshot(null);
-        }
-
-        // Subscribe to real-time updates
-        unsubscribeRealtimeChannel = db
+        realtimeChannel = db
           .channel(`service-providers:${nextUser.uid}`)
           .on(
             'postgres_changes',
@@ -122,12 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           )
           .subscribe();
-
       } catch (error: any) {
-        console.warn('AuthProvider user document load failed:', error);
-        setOnboardingComplete(false);
-        setShopName(null);
-        setLoading(false);
+        // Live updates are a nice-to-have; never let them reset the shop's state.
+        console.warn('AuthProvider live updates failed:', error?.message);
       }
     };
 

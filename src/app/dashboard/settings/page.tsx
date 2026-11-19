@@ -23,7 +23,7 @@ import { Loader2, UploadCloud } from "lucide-react";
 const serviceOptions = [
   { id: 'repairs', label: 'Repair', value: 'repairs' },
   { id: 'bikeFitting', label: 'Bike Fit', value: 'bike-fitting' },
-  { id: 'rental', label: 'Rental', value: 'rental' },
+  // Rental is off the menu for now (decision 2026-11-18).
 ] as const;
 
 export default function SettingsPage() {

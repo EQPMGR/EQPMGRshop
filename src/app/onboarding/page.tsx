@@ -43,7 +43,7 @@ type OnboardingFormValues = z.infer<typeof onboardingSchema>;
 
 const serviceOptions = [
     { id: 'repairs', label: 'Bicycle Repairs' },
-    { id: 'rental', label: 'Bicycle Rental' },
+    // Rental is off the menu for now (decision 2026-11-18).
     { id: 'bikeFitting', label: 'Bike Fit Services' },
 ] as const;
 
